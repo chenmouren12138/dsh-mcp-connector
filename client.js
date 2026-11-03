@@ -19,6 +19,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'mcpConnector'
     const API = '/dsh-mcp-connector/api'
+    const FEEDBACK_MS = 4500
     const POLL_MS = 3000
 
     // ── copy ──────────────────────────────────────────────────────────────────
@@ -45,6 +46,7 @@ window.__ModuleLoader__.load({
       clearSearch: '清除搜索',
       noMatch: '没有匹配「{query}」的服务器',
       moreActions: '更多操作',
+      rowActions: '该服务器操作',
       copyTools: '复制工具名',
       copyConfig: '复制配置',
       copyDiagnostic: '复制诊断',
@@ -217,6 +219,7 @@ window.__ModuleLoader__.load({
       clearSearch: 'Clear search',
       noMatch: 'No server matches “{query}”',
       moreActions: 'More actions',
+      rowActions: 'Server actions',
       copyTools: 'Copy tool names',
       copyConfig: 'Copy config',
       copyDiagnostic: 'Copy diagnostic',
@@ -527,6 +530,18 @@ window.__ModuleLoader__.load({
       '.mc-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px}',
       '.mc-btn-icon{width:30px;padding:0}',
       '.mc-icon-btn{width:28px;height:28px}',
+      '.mc-actions{display:inline-flex;align-items:center;gap:2px;padding:2px;margin-left:6px;',
+      'border:.5px solid var(--dsw-alias-border-l2);border-radius:999px;background:var(--dsw-alias-bg-layer-2)}',
+      '.mc-actions .mc-icon-btn{width:26px;height:26px;border-radius:999px}',
+      '.mc-actions .mc-icon-btn:hover:not(:disabled){background:var(--dsw-alias-bg-layer-3)}',
+      '.mc-act-test{color:var(--dsw-alias-label-secondary)}',
+      '.mc-act-retry{color:var(--dsw-alias-state-business-primary)}',
+      '.mc-act-power{color:var(--dsw-alias-label-secondary)}',
+      '.mc-act-power[data-on="false"]{color:var(--dsw-alias-state-warning-primary,var(--dsw-alias-label-secondary))}',
+      '.mc-act-edit{color:var(--dsw-alias-label-secondary)}',
+      '.mc-act-power[data-on="true"]{color:var(--dsw-alias-state-success-primary,var(--dsw-alias-state-business-primary))}',
+      '.mc-act-danger{color:var(--dsw-alias-state-error-primary)}',
+      '.mc-act-danger:hover:not(:disabled){background:var(--dsw-alias-bg-layer-3)}',
       '.mc-icon-danger{color:var(--dsw-alias-state-error-primary)}',
       '.mc-item .mc-note{margin:0}',
       '.mc-search{position:relative;display:flex;align-items:center;flex:1 1 220px;max-width:340px;min-width:0}',
@@ -1677,95 +1692,101 @@ window.__ModuleLoader__.load({
             ? h('span', { className: 'mc-chip' }, t('toolsCount', { count: server.toolCount }))
             : null,
           h('span', { className: 'mc-spacer' }),
-          h('span', { className: 'mc-spacer' }),
+          // One segmented bar with semantic colour per action: test/edit neutral,
+          // retry business, power success/warning by state, delete danger.
           h(
-            'button',
-            {
-              type: 'button',
-              className: 'mc-icon-btn',
-              title: t('test'),
-              'aria-label': t('test'),
-              disabled: busy !== '',
-              onClick: () => onAction('test', server),
-            },
-            h(Icon, { name: 'plug' }),
-          ),
-          h(
-            'button',
-            {
-              type: 'button',
-              className: 'mc-icon-btn',
-              title: t('retry'),
-              'aria-label': t('retry'),
-              disabled: busy !== '' || server.disabled,
-              onClick: () => onAction('retry', server),
-            },
-            h(Icon, { name: 'retry' }),
-          ),
-          h(
-            'button',
-            {
-              type: 'button',
-              className: 'mc-icon-btn',
-              title: server.disabled ? t('enable') : t('disable'),
-              'aria-label': server.disabled ? t('enable') : t('disable'),
-              disabled: busy !== '',
-              onClick: () => onAction(server.disabled ? 'enable' : 'disable', server),
-            },
-            h(Icon, { name: 'power' }),
-          ),
-          h(
-            'button',
-            {
-              type: 'button',
-              className: 'mc-icon-btn',
-              title: t('edit'),
-              'aria-label': t('edit'),
-              disabled: busy !== '',
-              onClick: () => onAction('edit', server),
-            },
-            h(Icon, { name: 'pencil' }),
-          ),
-          confirming
-            ? [
-              h(
-                'button',
-                {
-                  key: 'confirm',
-                  type: 'button',
-                  className: 'mc-icon-btn mc-icon-danger',
-                  title: t('confirmRemove'),
-                  'aria-label': t('confirmRemove'),
-                  disabled: busy !== '',
-                  onClick: () => onAction('remove', server),
-                },
-                h(Icon, { name: 'check' }),
-              ),
-              h(
-                'button',
-                {
-                  key: 'cancel',
-                  type: 'button',
-                  className: 'mc-icon-btn',
-                  title: t('cancel'),
-                  'aria-label': t('cancel'),
-                  onClick: () => setConfirming(false),
-                },
-                h(Icon, { name: 'close' }),
-              ),
-            ]
-            : h(
+            'div',
+            { className: 'mc-actions', role: 'group', 'aria-label': t('rowActions') },
+            h(
               'button',
               {
                 type: 'button',
-                className: 'mc-icon-btn',
-                title: t('remove'),
-                'aria-label': t('remove'),
+                className: 'mc-icon-btn mc-act-test',
+                title: t('test'),
+                'aria-label': t('test'),
                 disabled: busy !== '',
-                onClick: () => setConfirming(true),
+                onClick: () => onAction('test', server),
               },
-              h(Icon, { name: 'trash' }),
+              h(Icon, { name: 'plug' }),
             ),
+            h(
+              'button',
+              {
+                type: 'button',
+                className: 'mc-icon-btn mc-act-retry',
+                title: t('retry'),
+                'aria-label': t('retry'),
+                disabled: busy !== '' || server.disabled,
+                onClick: () => onAction('retry', server),
+              },
+              h(Icon, { name: 'retry' }),
+            ),
+            h(
+              'button',
+              {
+                type: 'button',
+                className: 'mc-icon-btn mc-act-power',
+                'data-on': server.disabled ? 'false' : 'true',
+                title: server.disabled ? t('enable') : t('disable'),
+                'aria-label': server.disabled ? t('enable') : t('disable'),
+                disabled: busy !== '',
+                onClick: () => onAction(server.disabled ? 'enable' : 'disable', server),
+              },
+              h(Icon, { name: 'power' }),
+            ),
+            h(
+              'button',
+              {
+                type: 'button',
+                className: 'mc-icon-btn mc-act-edit',
+                title: t('edit'),
+                'aria-label': t('edit'),
+                disabled: busy !== '',
+                onClick: () => onAction('edit', server),
+              },
+              h(Icon, { name: 'pencil' }),
+            ),
+            confirming
+              ? [
+                h(
+                  'button',
+                  {
+                    key: 'confirm',
+                    type: 'button',
+                    className: 'mc-icon-btn mc-act-danger',
+                    title: t('confirmRemove'),
+                    'aria-label': t('confirmRemove'),
+                    disabled: busy !== '',
+                    onClick: () => onAction('remove', server),
+                  },
+                  h(Icon, { name: 'check' }),
+                ),
+                h(
+                  'button',
+                  {
+                    key: 'cancel',
+                    type: 'button',
+                    className: 'mc-icon-btn',
+                    title: t('cancel'),
+                    'aria-label': t('cancel'),
+                    onClick: () => setConfirming(false),
+                  },
+                  h(Icon, { name: 'close' }),
+                ),
+              ]
+              : h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'mc-icon-btn mc-act-danger',
+                  title: t('remove'),
+                  'aria-label': t('remove'),
+                  disabled: busy !== '',
+                  onClick: () => setConfirming(true),
+                },
+                h(Icon, { name: 'trash' }),
+              ),
+          ),
         ),
         h(
           'div',
@@ -1781,9 +1802,6 @@ window.__ModuleLoader__.load({
             : server.state === 'reconnecting'
               ? h('p', { className: 'mc-hint' }, t('hintReconnecting'))
               : null,
-        Array.isArray(server.notes) && server.notes.length > 0
-          ? h('p', { className: 'mc-hint' }, server.notes.join('；'))
-          : null,
         feedback
           ? h(Note, { kind: feedback.kind }, feedback.message)
           : null,
@@ -2052,6 +2070,7 @@ window.__ModuleLoader__.load({
       const [probeReport, setProbeReport] = useState(null)
       const [query, setQuery] = useState('')
       const [feedback, setFeedback] = useState({})
+      const feedbackTimers = useRef(new Map())
       const [toolsMenu, setToolsMenu] = useState(false)
       const alive = useRef(true)
       const lastFocus = useRef(null)
@@ -2086,8 +2105,32 @@ window.__ModuleLoader__.load({
         return () => {
           alive.current = false
           clearInterval(timer)
+          for (const pending of feedbackTimers.current.values()) clearTimeout(pending)
+          feedbackTimers.current.clear()
         }
       }, [refresh])
+
+      /**
+       * Show a receipt on one card and retire it on its own. Timers are unref'd so a
+       * pending dismissal never holds the process open, and per-id bookkeeping keeps
+       * a second action from being cleared by the first action's timer.
+       */
+      const showFeedback = useCallback((id, note) => {
+        setFeedback((current) => ({ ...current, [id]: note }))
+        const timers = feedbackTimers.current
+        const existing = timers.get(id)
+        if (existing) clearTimeout(existing)
+        if (!note) {
+          timers.delete(id)
+          return
+        }
+        const timer = setTimeout(() => {
+          timers.delete(id)
+          setFeedback((current) => ({ ...current, [id]: undefined }))
+        }, FEEDBACK_MS)
+        timer.unref?.()
+        timers.set(id, timer)
+      }, [])
 
       const act = useCallback(async (action, server) => {
         setBusyId({ id: server.id, action })
@@ -2095,7 +2138,7 @@ window.__ModuleLoader__.load({
         setProbeReport(null)
         // Per-card receipt: the result of an action belongs to the card it was run
         // on, not to a page-level banner the user has to associate back to a row.
-        setFeedback((current) => ({ ...current, [server.id]: undefined }))
+        showFeedback(server.id, undefined)
         try {
           if (action === 'edit') {
             openEditor({ mode: 'edit', server })
@@ -2122,15 +2165,15 @@ window.__ModuleLoader__.load({
             await refresh()
             return
           }
-          setFeedback((current) => ({ ...current, [server.id]: { kind: 'ok', message } }))
+          showFeedback(server.id, { kind: 'ok', message })
           await refresh()
         } catch (error) {
           const message = `${error.code ?? 'ACTION_FAILED'} · ${error.phase ?? 'config'} · ${error.message}`
-          setFeedback((current) => ({ ...current, [server.id]: { kind: 'error', message } }))
+          showFeedback(server.id, { kind: 'error', message })
         } finally {
           setBusyId(null)
         }
-      }, [refresh])
+      }, [refresh, showFeedback])
 
       const afterSave = useCallback(async (result) => {
         setToast(result?.receipt?.message ?? '')
@@ -2154,11 +2197,11 @@ window.__ModuleLoader__.load({
           })
         }
         if (result?.receipt?.id) {
-          setFeedback((current) => ({ ...current, [result.receipt.id]: { kind: 'ok', message: result.receipt.message ?? '' } }))
+          showFeedback(result.receipt.id, { kind: 'ok', message: result.receipt.message ?? '' })
         }
         closeEditor()
         await refresh()
-      }, [closeEditor, refresh])
+      }, [closeEditor, refresh, showFeedback])
 
       const stats = snapshot?.stats
       const servers = snapshot?.servers ?? []

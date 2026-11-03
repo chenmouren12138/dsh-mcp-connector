@@ -408,6 +408,7 @@ await check('列表展示状态徽标、最近成功与错误摘要', async () =
       {
         id: 'a1',
         serverName: 'demo',
+        notes: ['服务器未下发 Mcp-Session-Id（会话无状态运行）'],
         disabled: false,
         state: 'ready',
         stateLabel: '就绪',
@@ -452,6 +453,8 @@ await check('列表展示状态徽标、最近成功与错误摘要', async () =
   assert.match(text, /1 个工具/)
   assert.match(text, /HTTP_AUTH/)
   assert.equal(calls.filter((call) => call.action === 'state').length, 0)
+  // Connection warnings stay out of the card; they are noise for the operator.
+  assert.ok(!text.includes('Mcp-Session-Id'), 'session note hidden')
 
   // Last-success lives in the details now, keeping the row to one meta line.
   const disclosure = findAll(root, (node) => node.props?.className === 'mc-disclosure')[0]
