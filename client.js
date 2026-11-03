@@ -45,8 +45,9 @@ window.__ModuleLoader__.load({
       oauthAuthorized: '已授权',
       oauthFailed: '授权失败：{message}',
       testOkShort: '连接有效',
-      lastTestOk: '最近测试（{when}）：连接有效 · {summary}',
-      lastTestFail: '最近测试（{when}）未通过：{summary}',
+      probeOkShort: '连接有效 · {count} 个工具 · {ms}ms',
+      probeFailShort: '连接失败：{code} · {message}',
+
       testFailedShort: '测试未通过',
       hintAuth: '需要鉴权：在「编辑」里加请求头（如 Figma 用 X-Figma-Token），或点「授权」走 OAuth（当前 401）。',
       oauthUnsupported: '该服务器不支持 OAuth 授权',
@@ -170,8 +171,9 @@ window.__ModuleLoader__.load({
       oauthAuthorized: 'Authorized',
       oauthFailed: 'Authorization failed: {message}',
       testOkShort: 'Connected',
-      lastTestOk: 'Last test ({when}): connected · {summary}',
-      lastTestFail: 'Last test ({when}) failed: {summary}',
+      probeOkShort: 'Connected · {count} tools · {ms}ms',
+      probeFailShort: 'Connection failed: {code} · {message}',
+
       testFailedShort: 'Test failed',
       hintAuth: 'Authentication needed: add a header in 编辑 (Figma uses X-Figma-Token), or press 授权 for OAuth (401).',
       oauthUnsupported: 'This server does not support OAuth',
@@ -1867,7 +1869,24 @@ window.__ModuleLoader__.load({
               busy === 'probe' ? t('testing') : t('testDraft'),
             ),
             h('span', { className: 'mc-toolbar-spacer' }),
-            status ? h('span', { className: 'mc-hint', role: 'status' }, status) : null,
+            probe
+              ? h(
+                'span',
+                {
+                  className: probe.ok === false || probe.error ? 'mc-hint mc-err' : 'mc-hint mc-oauth-ok',
+                  role: 'status',
+                },
+                probe.ok === false || probe.error
+                  ? t('probeFailShort', {
+                    code: probe.error?.code ?? 'ACTION_FAILED',
+                    message: String(probe.error?.message ?? '').slice(0, 120),
+                  })
+                  : t('probeOkShort', {
+                    count: Array.isArray(probe.tools) ? probe.tools.length : 0,
+                    ms: probe.elapsedMs ?? 0,
+                  }),
+              )
+              : status ? h('span', { className: 'mc-hint', role: 'status' }, status) : null,
             h('button', { type: 'button', className: 'mc-btn', onClick: onCancel }, t('cancel')),
             h(
               'button',
@@ -1959,7 +1978,7 @@ window.__ModuleLoader__.load({
      * compete for attention. The row name itself is the details disclosure, so the
      * whole left side is one large target instead of a tiny chevron.
      */
-    function ServerItem({ server, t, locale, busy, onAction, feedback, testResult }) {
+    function ServerItem({ server, t, locale, busy, onAction, feedback }) {
       const [open, setOpen] = useState(false)
       const [confirming, setConfirming] = useState(false)
       const [copied, setCopied] = useState('')
@@ -2030,13 +2049,6 @@ window.__ModuleLoader__.load({
             'div',
             { className: 'mc-actions', role: 'group', 'aria-label': t('rowActions') },
             h(TipButton, {
-              label: t('test'),
-              icon: 'plug',
-              className: 'mc-act-test',
-              disabled: busy !== '',
-              onClick: () => onAction('test', server),
-            }),
-            h(TipButton, {
               label: t('retry'),
               icon: 'retry',
               className: 'mc-act-retry',
@@ -2098,18 +2110,6 @@ window.__ModuleLoader__.load({
             : server.oauth?.status === 'error'
               ? h('p', { className: 'mc-hint mc-err' }, t('oauthFailed', { message: server.oauth.error?.message ?? '' }))
               : null,
-        busy === 'test'
-          ? h('p', { className: 'mc-hint' }, t('testing'))
-          : null,
-        testResult
-          ? h(
-            'p',
-            { className: testResult.ok ? 'mc-hint mc-oauth-ok' : 'mc-hint mc-err' },
-            testResult.ok
-              ? t('lastTestOk', { summary: testResult.message, when: formatTime(testResult.at, locale) })
-              : t('lastTestFail', { summary: testResult.message, when: formatTime(testResult.at, locale) }),
-          )
-          : null,
         server.state === 'error' && server.lastError?.code === 'HTTP_AUTH' && !server.oauth?.authorized
           ? h('p', { className: 'mc-hint mc-err' }, t('hintAuth'))
           : null,
@@ -2219,7 +2219,6 @@ window.__ModuleLoader__.load({
       const [refreshing, setRefreshing] = useState(false)
       const [refreshNote, setRefreshNote] = useState('')
       const [feedback, setFeedback] = useState({})
-      const [testResults, setTestResults] = useState({})
       const feedbackTimers = useRef(new Map())
       const searchRef = useRef(null)
       const listRef = useRef(null)
@@ -2356,35 +2355,6 @@ window.__ModuleLoader__.load({
         try {
           if (action === 'edit') {
             openEditor({ mode: 'edit', server })
-            return
-          }
-          if (action === 'test') {
-            const report = await request('testConnection', { id: server.id })
-            setProbeReport({ for: server.serverName, report })
-            const failed = report?.ok === false || Boolean(report?.error)
-            setTestResults((current) => ({
-              ...current,
-              [server.id]: {
-                ok: !failed,
-                message: failed
-                  ? `${report?.error?.code ?? 'ACTION_FAILED'} · ${report?.error?.message ?? ''}`
-                  : t('toolsCount', { count: Array.isArray(report?.tools) ? report.tools.length : 0 }),
-                at: Date.now(),
-              },
-            }))
-            if (report?.ok === false || report?.error) {
-              const detail = report?.error ?? {}
-              showFeedback(server.id, {
-                kind: 'error',
-                message: `${t('testFailedShort')}：${detail.code ?? 'ACTION_FAILED'} · ${detail.message ?? ''}`,
-              })
-            } else {
-              const count = Array.isArray(report?.tools) ? report.tools.length : 0
-              showFeedback(server.id, {
-                kind: 'ok',
-                message: `${t('testOkShort')} · ${t('toolsCount', { count })}`,
-              })
-            }
             return
           }
           let message = ''
@@ -2649,7 +2619,6 @@ window.__ModuleLoader__.load({
                   busy: busyId?.id === server.id ? busyId.action : '',
                   onAction: act,
                   feedback: feedback[server.id],
-                  testResult: testResults[server.id],
                 })
                 if (!(editor && editor.mode === 'edit' && editor.server?.id === server.id)) return [row]
                 return [

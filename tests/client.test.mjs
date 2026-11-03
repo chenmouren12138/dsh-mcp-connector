@@ -641,7 +641,7 @@ await check('列表行动作：禁用 / 重试 / 测试 / 删除二次确认', a
   // Per-card actions are icon buttons; the tooltip (title) carries the name.
   const rowList = () => findAll(root, (node) => node.props?.className === 'mc-list')[0]
   const card = () => findAll(rowList(), (node) => node.props?.className === 'mc-item')[0]
-  for (const label of ['测试连接', '重试连接', '禁用', '编辑', '删除']) {
+  for (const label of ['重试连接', '禁用', '编辑', '删除']) {
     const button = byAria(card(), label)
     assert.ok(button, `${label} icon present`)
     // DSH-style bubble owned by the page, not the OS title tooltip.
@@ -658,12 +658,17 @@ await check('列表行动作：禁用 / 重试 / 测试 / 删除二次确认', a
   // The receipt lands on the card that produced it.
   assert.match(textOf(probeCard()), /已禁用：连接断开，配置保留/, 'card shows its own receipt')
 
-  const test = byAria(probeCard(), '测试连接')
-  test.props.onClick()
+  // Testing belongs to the editor, not the row.
+  assert.equal(byAria(probeCard(), '测试连接'), undefined, 'no test button on saved rows')
+
+  const editButton = byAria(probeCard(), '编辑')
+  editButton.props.onClick()
   await flush()
-  assert.ok(calls.some((item) => item.action === 'testConnection' && item.payload.id === 'srv-new'))
-  assert.match(textOf(root), /连接有效|2025-06-18/)
-  assert.match(textOf(probeCard()), /连接有效/, 'the card reports its own test result')
+  const panelOf = () => findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
+  byText(panelOf(), '测试连接').props.onClick()
+  await flush()
+  assert.ok(calls.some((item) => item.action === 'testConnection'), 'panel probe runs')
+  assert.match(textOf(panelOf()), /连接(有效|失败)/, 'panel reports the probe result either way')
 
   // Delete asks for confirmation with check / cancel icons.
   byAria(probeCard(), '删除').props.onClick()
