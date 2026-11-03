@@ -2088,6 +2088,8 @@ window.__ModuleLoader__.load({
               value: query,
               spellCheck: false,
               onChange: (event) => setQuery(event.target.value),
+              onInput: (event) => setQuery(event.currentTarget.value),
+              onCompositionEnd: (event) => setQuery(event.currentTarget.value),
               onKeyDown: (event) => {
                 if (event.key === 'Escape') {
                   event.stopPropagation()
