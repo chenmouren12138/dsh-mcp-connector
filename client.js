@@ -46,7 +46,7 @@ window.__ModuleLoader__.load({
       oauthFailed: '授权失败：{message}',
       testOkShort: '连接有效',
       testFailedShort: '测试未通过',
-      hintAuth: '需要鉴权：点「授权」走 OAuth，或在「编辑」里配置请求头（当前错误码 HTTP_AUTH）。',
+      hintAuth: '需要鉴权：在「编辑」里加请求头（如 Figma 用 X-Figma-Token），或点「授权」走 OAuth（当前 401）。',
       oauthUnsupported: '该服务器不支持 OAuth 授权',
       copyTools: '复制工具名',
       copyConfig: '复制配置',
@@ -169,7 +169,7 @@ window.__ModuleLoader__.load({
       oauthFailed: 'Authorization failed: {message}',
       testOkShort: 'Connected',
       testFailedShort: 'Test failed',
-      hintAuth: 'Authentication needed: press 授权 for OAuth, or add a header in 编辑 (HTTP_AUTH).',
+      hintAuth: 'Authentication needed: add a header in 编辑 (Figma uses X-Figma-Token), or press 授权 for OAuth (401).',
       oauthUnsupported: 'This server does not support OAuth',
       copyTools: 'Copy tool names',
       copyConfig: 'Copy config',
@@ -1996,6 +1996,7 @@ window.__ModuleLoader__.load({
             ? h('span', { className: 'mc-chip' }, t('toolsCount', { count: server.toolCount }))
             : null,
           server.config.transport !== 'stdio'
+            && (Object.keys(server.config.headers ?? {}).length === 0 || server.oauth?.status !== 'none')
             ? h(
               'button',
               {
