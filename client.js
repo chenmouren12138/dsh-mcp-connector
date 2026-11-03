@@ -31,6 +31,7 @@ window.__ModuleLoader__.load({
       title: 'MCP Connector',
       intro: '把外部 MCP 服务器的工具接入本部署：以 mcp__<服务器>__<工具> 命名注册，随插件卸装自动注销。',
       summary: '{servers} 台服务器 · {ready} 就绪 · {tools} 个工具',
+      refreshed: '已刷新',
       statServers: '服务器',
       statReady: '就绪',
       statTools: '工具',
@@ -204,6 +205,7 @@ window.__ModuleLoader__.load({
       title: 'MCP Connector',
       intro: 'Bridge external MCP servers into this deployment: tools register as mcp__<server>__<tool> and unregister with the plugin.',
       summary: '{servers} servers · {ready} ready · {tools} tools',
+      refreshed: 'Refreshed',
       statServers: 'Servers',
       statReady: 'Ready',
       statTools: 'Tools',
@@ -419,6 +421,9 @@ window.__ModuleLoader__.load({
       '.mc-badge{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 7px;',
       'border-radius:999px;font-size:11.5px;line-height:20px;',
       'border:.5px solid var(--dsw-alias-border-l3);color:var(--dsw-alias-label-secondary)}',
+      '@keyframes mc-spin{to{transform:rotate(360deg)}}',
+      '.mc-spin{animation:mc-spin .8s linear infinite}',
+      '.mc-refreshed{color:var(--dsw-alias-state-business-primary)}',
       '.mc-dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--dsw-alias-label-tertiary)}',
       '[data-tone="ready"] .mc-dot{background:var(--dsw-alias-state-business-primary)}',
       '[data-tone="degraded"] .mc-dot{background:var(--dsw-alias-state-warning-primary,var(--dsw-alias-state-business-primary))}',
@@ -1872,6 +1877,8 @@ window.__ModuleLoader__.load({
       const [toast, setToast] = useState('')
       const [probeReport, setProbeReport] = useState(null)
       const [query, setQuery] = useState('')
+      const [refreshing, setRefreshing] = useState(false)
+      const [refreshNote, setRefreshNote] = useState('')
       const [feedback, setFeedback] = useState({})
       const feedbackTimers = useRef(new Map())
       const alive = useRef(true)
@@ -1933,6 +1940,18 @@ window.__ModuleLoader__.load({
         timer.unref?.()
         timers.set(id, timer)
       }, [])
+
+      const refreshNow = useCallback(async () => {
+        setRefreshing(true)
+        setRefreshNote('')
+        try {
+          await refresh()
+          setRefreshNote(t('refreshed'))
+          setTimeout(() => setRefreshNote(''), 2200).unref?.()
+        } finally {
+          setRefreshing(false)
+        }
+      }, [refresh, t])
 
       const act = useCallback(async (action, server) => {
         setBusyId({ id: server.id, action })
@@ -2031,15 +2050,18 @@ window.__ModuleLoader__.load({
           { className: 'mc-head' },
           h('h2', { className: 'mc-title' }, t('title')),
         ),
-        stats
+        stats || refreshNote
           ? h(
             'p',
             { className: 'mc-summary' },
-            t('summary', {
-              servers: stats.total,
-              tools: stats.tools,
-              ready: stats.ready + stats.degraded,
-            }),
+            stats
+              ? t('summary', {
+                servers: stats.total,
+                tools: stats.tools,
+                ready: stats.ready + stats.degraded,
+              })
+              : null,
+            refreshNote ? h('span', { className: 'mc-refreshed' }, ` · ${refreshNote}`) : null,
           )
           : null,
 
@@ -2075,8 +2097,14 @@ window.__ModuleLoader__.load({
           h('span', { className: 'mc-toolbar-spacer' }),
           h(
             'button',
-            { type: 'button', className: 'mc-btn', onClick: refresh },
-            h(Icon, { name: 'reload' }),
+            {
+              type: 'button',
+              className: 'mc-btn',
+              disabled: refreshing,
+              'aria-busy': refreshing ? 'true' : undefined,
+              onClick: refreshNow,
+            },
+            h(Icon, { name: 'reload', className: refreshing ? 'mc-spin' : undefined }),
             t('refresh'),
           ),
           h(

@@ -285,6 +285,8 @@ const handlers = {
   },
 }
 
+let loads = 0
+
 async function fetchMock(url, init = {}) {
   if (!String(url).includes('/dsh-mcp-connector/api')) {
     throw new Error(`unexpected fetch ${url}`)
@@ -302,6 +304,7 @@ async function fetchMock(url, init = {}) {
     }
     return { ok: true, status: 200, json: async () => payload }
   }
+  loads += 1
   return { ok: true, status: 200, json: async () => ({ ok: true, data: snapshot }) }
 }
 
@@ -745,6 +748,18 @@ await check('必填校验：空名称点击保存给出红框与小字提示', a
   const after = findAll(panel, (node) => node.type === 'input' && node.props?.['aria-label'] === '服务地址')[0]
   assert.equal(after.props['aria-invalid'], 'true', 'invalid field is marked')
   assert.match(textOf(panel), /必填/, 'small required hint shown')
+})
+
+await check('刷新按钮触发重新拉取并给出已刷新提示', async () => {
+  root = mount()
+  await flush()
+  const before = loads
+  const button = findAll(root, (node) => typeof node.props?.onClick === 'function' && textOf(node) === '刷新')[0]
+  assert.ok(button, 'refresh button')
+  button.props.onClick()
+  await flush()
+  assert.ok(loads > before, 'refetch happened')
+  assert.match(textOf(root), /已刷新/, 'confirmation shown')
 })
 
 const failed = results.filter((item) => !item.ok)

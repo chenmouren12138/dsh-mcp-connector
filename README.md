@@ -209,7 +209,7 @@ DSH 插件：在 Cordis 运行时内实现一个 **MCP Client 能力 Seam**，�
 ```bash
 node tests/host.test.mjs     # 37 项：协议、传输、错误域、CRUD、导入导出、凭据引用、持久化、清理
 node tests/api.test.mjs      # 12 项：设置页所用的同源管理 API（快照、动作、守卫、凭据、导入失败信封）
-node tests/client.test.mjs   # 13 项：迷你 React 运行时里驱动设置页，验证每次交互打到正确端点
+node tests/client.test.mjs   # 14 项：迷你 React 运行时里驱动设置页，验证每次交互打到正确端点
 ```
 
 `host.test.mjs` 真实启动一个 stdio MCP 服务器（`tests/echo-server.mjs`）与若干 HTTP 端点，覆盖成功路径与 `COMMAND_NOT_FOUND` / `CWD_MISSING` / `NETWORK_TCP` / `HTTP_AUTH` / `HTTP_NOT_FOUND` / `HTTP_SERVER_ERROR` / 工具业务错误等失败路径，并断言快照里不会出现任何凭据字面量。`api.test.mjs` 把真实的 `registerApi` 挂到假 webServer 上，按页面的调用方式走一遍 `GET /api`、各动作、`404/405/400` 守卫与导入拒绝信封。
