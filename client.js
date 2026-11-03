@@ -540,6 +540,8 @@ window.__ModuleLoader__.load({
       '.mc-icon-open{transform:rotate(90deg)}',
       '.mc-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px}',
       '.mc-btn-icon{width:30px;padding:0}',
+      '.mc-btn-outline{width:30px;border:.5px solid var(--dsw-alias-border-l3);border-radius:var(--dsw-radius-sm)}',
+      '.mc-btn-outline:hover:not(:disabled){background:var(--dsw-alias-bg-layer-3);border-color:var(--dsw-alias-border-l4)}',
       '.mc-icon-btn{width:28px;height:28px}',
       '.mc-actions{display:inline-flex;align-items:center;gap:2px;padding:2px;margin-left:6px;',
       'border:.5px solid var(--dsw-alias-border-l2);border-radius:999px;background:var(--dsw-alias-bg-layer-2)}',
@@ -817,7 +819,7 @@ window.__ModuleLoader__.load({
      * with OS chrome, delays for about a second and cannot be themed, so the
      * tooltip is drawn here with the same tokens as the rest of the shell.
      */
-    function TipButton({ label, icon, className, disabled, onClick, tone }) {
+    function TipButton({ label, icon, iconClassName, className, disabled, onClick, tone }) {
       return h(
         'span',
         { className: 'mc-tip-wrap' },
@@ -831,7 +833,7 @@ window.__ModuleLoader__.load({
             disabled,
             onClick,
           },
-          h(Icon, { name: icon }),
+          h(Icon, { name: icon, className: iconClassName }),
         ),
         h('span', { className: 'mc-tip', role: 'tooltip' }, label),
       )
@@ -2095,18 +2097,14 @@ window.__ModuleLoader__.load({
               : null,
           ),
           h('span', { className: 'mc-toolbar-spacer' }),
-          h(
-            'button',
-            {
-              type: 'button',
-              className: 'mc-btn',
-              disabled: refreshing,
-              'aria-busy': refreshing ? 'true' : undefined,
-              onClick: refreshNow,
-            },
-            h(Icon, { name: 'reload', className: refreshing ? 'mc-spin' : undefined }),
-            t('refresh'),
-          ),
+          h(TipButton, {
+            label: t('refresh'),
+            icon: 'reload',
+            iconClassName: refreshing ? 'mc-spin' : undefined,
+            className: 'mc-btn-outline',
+            disabled: refreshing,
+            onClick: refreshNow,
+          }),
           h(
             'button',
             { type: 'button', className: 'mc-btn mc-btn-primary', onClick: () => openEditor({ mode: 'add' }) },

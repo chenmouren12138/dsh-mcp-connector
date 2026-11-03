@@ -754,8 +754,8 @@ await check('刷新按钮触发重新拉取并给出已刷新提示', async () =
   root = mount()
   await flush()
   const before = loads
-  const button = findAll(root, (node) => typeof node.props?.onClick === 'function' && textOf(node) === '刷新')[0]
-  assert.ok(button, 'refresh button')
+  const button = byAria(root, '刷新')
+  assert.ok(button, 'refresh icon button')
   button.props.onClick()
   await flush()
   assert.ok(loads > before, 'refetch happened')
