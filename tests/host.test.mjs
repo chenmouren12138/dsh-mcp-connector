@@ -3,9 +3,12 @@
 // server and scratch HTTP endpoints. No browser, no DSH host required.
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
+import os from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { resolveExecutable } from '../lib/transport-stdio.js'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.dirname(HERE)
@@ -123,6 +126,22 @@ try {
   const { ctx, registered, effects, events } = mockCtx()
   const runtime = apply(ctx, { registry: { dataDir: DATA } })
   await runtime.ready
+
+  await check('Windows 上按 PATHEXT 选启动器（npx 而不是无扩展名的脚本）', () => {
+    if (process.platform !== 'win32') return
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'resolver-'))
+    writeFileSync(path.join(dir, 'demo-tool'), '#!/bin/sh\n')
+    writeFileSync(path.join(dir, 'demo-tool.cmd'), '@echo off\n')
+    const saved = process.env.PATH
+    try {
+      process.env.PATH = dir
+      const resolved = resolveExecutable('demo-tool')
+      assert.equal(path.extname(resolved).toLowerCase(), '.cmd', `resolved=${resolved}`)
+    } finally {
+      process.env.PATH = saved
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 
   await check('空注册表启动', () => {
     const snapshot = runtime.snapshot()
