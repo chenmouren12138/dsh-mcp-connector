@@ -29,6 +29,7 @@ window.__ModuleLoader__.load({
     const ZH = {
       title: 'MCP Connector',
       intro: '把外部 MCP 服务器的工具接入本部署：以 mcp__<服务器>__<工具> 命名注册，随插件卸装自动注销。',
+      summary: '{servers} 台服务器 · {ready} 就绪 · {tools} 个工具',
       statServers: '服务器',
       statReady: '就绪',
       statTools: '工具',
@@ -76,6 +77,7 @@ window.__ModuleLoader__.load({
       serverLabel: '服务器信息',
       toolsLabel: '工具',
       statsLabel: '统计',
+      lastSuccessLabel: '最近成功',
       errorLabel: '最近错误',
       notesLabel: '备注',
       phaseLabel: '阶段',
@@ -197,6 +199,7 @@ window.__ModuleLoader__.load({
     const EN = {
       title: 'MCP Connector',
       intro: 'Bridge external MCP servers into this deployment: tools register as mcp__<server>__<tool> and unregister with the plugin.',
+      summary: '{servers} servers · {ready} ready · {tools} tools',
       statServers: 'Servers',
       statReady: 'Ready',
       statTools: 'Tools',
@@ -244,6 +247,7 @@ window.__ModuleLoader__.load({
       serverLabel: 'Server',
       toolsLabel: 'Tools',
       statsLabel: 'Stats',
+      lastSuccessLabel: 'Last success',
       errorLabel: 'Last error',
       notesLabel: 'Notes',
       phaseLabel: 'Phase',
@@ -453,6 +457,7 @@ window.__ModuleLoader__.load({
       'color:var(--dsw-alias-label-secondary)}',
       '.mc-footer{display:flex;align-items:center;gap:10px;flex-wrap:wrap}',
       '.mc-toast{flex:1;min-width:0;font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}',
+      '.mc-summary{margin:0;font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}',
       '.mc-cred{display:flex;flex-direction:column;gap:6px;padding:10px 12px;',
       'border:.5px dashed var(--dsw-alias-border-l3);border-radius:var(--dsw-radius-sm)}',
       '.mc-cred-title{margin:0;font-size:12.5px;font-weight:500;line-height:18px;',
@@ -1661,18 +1666,9 @@ window.__ModuleLoader__.load({
         h(
           'div',
           { className: 'mc-meta' },
-          h('code', null, server.config.transport),
-          ' · ',
           h('span', { className: 'mc-mono' }, endpoint ?? ''),
-          server.protocolVersion ? ` · ${server.protocolVersion}` : null,
-        ),
-        h(
-          'div',
-          { className: 'mc-meta' },
-          lastSuccess ? t('lastSuccess', { when: lastSuccess }) : t('never'),
-          error
-            ? h('span', { className: 'mc-err' }, ` · ${error.code}（${error.phase}）：${error.message}`)
-            : null,
+          server.toolCount > 0 ? ` · ${t('toolsCount', { count: server.toolCount })}` : null,
+          error ? h('span', { className: 'mc-err' }, ` · ${error.code}：${error.message}`) : null,
         ),
         Array.isArray(server.notes) && server.notes.length > 0
           ? h('p', { className: 'mc-hint' }, server.notes.join('；'))
@@ -1753,7 +1749,14 @@ window.__ModuleLoader__.load({
               h('dt', null, t('serverLabel')),
               h('dd', null, server.serverInfo ? `${server.serverInfo.name ?? '?'} ${server.serverInfo.version ?? ''}` : t('none')),
               h('dt', null, t('statsLabel')),
-              h('dd', null, t('statsLine', server.stats)),
+              h('dd', null, t('statsLine', {
+                attempts: server.stats.attempts,
+                reconnects: server.stats.reconnects,
+                calls: server.stats.toolCalls,
+                errors: server.stats.toolErrors,
+              })),
+              h('dt', null, t('lastSuccessLabel')),
+              h('dd', null, lastSuccess ? t('lastSuccess', { when: lastSuccess }) : t('never')),
               server.reconnectAt ? h('dt', null, 'reconnect') : null,
               server.reconnectAt ? h('dd', null, formatTime(server.reconnectAt, locale)) : null,
             ),
@@ -2015,6 +2018,7 @@ window.__ModuleLoader__.load({
       const [toast, setToast] = useState('')
       const [probeReport, setProbeReport] = useState(null)
       const [query, setQuery] = useState('')
+      const [toolsMenu, setToolsMenu] = useState(false)
       const alive = useRef(true)
       const lastFocus = useRef(null)
       const openEditor = useCallback((next) => {
@@ -2136,30 +2140,16 @@ window.__ModuleLoader__.load({
           'header',
           { className: 'mc-head' },
           h('h2', { className: 'mc-title' }, t('title')),
-          h('p', { className: 'mc-intro' }, t('intro')),
         ),
-
         stats
           ? h(
-            'div',
-            { className: 'mc-stats' },
-            h('div', { className: 'mc-stat' }, h('span', { className: 'mc-stat-value' }, String(stats.total)), h('span', { className: 'mc-stat-label' }, t('statServers'))),
-            h('div', { className: 'mc-stat' }, h('span', { className: 'mc-stat-value' }, String(stats.ready + stats.degraded)), h('span', { className: 'mc-stat-label' }, t('statReady'))),
-            h('div', { className: 'mc-stat' }, h('span', { className: 'mc-stat-value' }, String(stats.tools)), h('span', { className: 'mc-stat-label' }, t('statTools'))),
-            h('div', { className: 'mc-stat' }, h('span', { className: 'mc-stat-value' }, String(stats.toolCalls)), h('span', { className: 'mc-stat-label' }, t('statCalls'))),
-            policy
-              ? h(
-                'div',
-                { className: 'mc-policy' },
-                h('span', null, `${t('policy')}：${policy.registryEnabled ? t('registryOn') : t('registryOff')}`),
-                h('span', null, t('policyLine', {
-                  transport: policy.allowedTransports.join(' / '),
-                  timeout: `${policy.defaultTimeoutMs}ms`,
-                  probe: `${policy.probeTimeoutMs}ms`,
-                })),
-                h('span', { className: 'mc-mono' }, policy.dataDir),
-              )
-              : null,
+            'p',
+            { className: 'mc-summary' },
+            t('summary', {
+              servers: stats.total,
+              tools: stats.tools,
+              ready: stats.ready + stats.degraded,
+            }),
           )
           : null,
 
@@ -2195,26 +2185,44 @@ window.__ModuleLoader__.load({
           h('span', { className: 'mc-toolbar-spacer' }),
           h(
             'button',
-            { type: 'button', className: 'mc-btn mc-btn-icon', onClick: refresh, title: t('refresh'), 'aria-label': t('refresh') },
-            h(Icon, { name: 'reload' }),
-          ),
-          h(
-            'button',
-            { type: 'button', className: 'mc-btn', onClick: () => setPanel(panel === 'import' ? '' : 'import') },
-            t('import'),
-          ),
-          h(
-            'button',
-            { type: 'button', className: 'mc-btn', onClick: () => setPanel(panel === 'export' ? '' : 'export') },
-            t('export'),
-          ),
-          h(
-            'button',
             { type: 'button', className: 'mc-btn mc-btn-primary', onClick: () => openEditor({ mode: 'add' }) },
             h(Icon, { name: 'plus' }),
             t('actionAdd'),
           ),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'mc-icon-btn',
+              'aria-label': t('moreActions'),
+              'aria-expanded': toolsMenu ? 'true' : 'false',
+              title: t('moreActions'),
+              onClick: () => setToolsMenu((value) => !value),
+            },
+            h(Icon, { name: 'more' }),
+          ),
         ),
+        toolsMenu
+          ? h(
+            'div',
+            { className: 'mc-more' },
+            h(
+              'button',
+              { type: 'button', className: 'mc-btn mc-btn-sm', onClick: () => { setPanel(panel === 'import' ? '' : 'import'); setToolsMenu(false) } },
+              t('import'),
+            ),
+            h(
+              'button',
+              { type: 'button', className: 'mc-btn mc-btn-sm', onClick: () => { setPanel(panel === 'export' ? '' : 'export'); setToolsMenu(false) } },
+              t('export'),
+            ),
+            h(
+              'button',
+              { type: 'button', className: 'mc-btn mc-btn-sm', onClick: () => { setToolsMenu(false); refresh() } },
+              t('refresh'),
+            ),
+          )
+          : null,
 
         loadError ? h(Note, { kind: 'error' }, `${t('loadFailed')}${loadError}`) : null,
         !snapshot && !loadError

@@ -396,8 +396,9 @@ await check('空注册表渲染标题、统计与空态', async () => {
   const text = textOf(root)
   assert.match(text, /MCP Connector/)
   assert.match(text, /还没有 MCP 服务器/)
-  assert.match(text, /部署策略/)
-  assert.match(text, /运行时注册表开启/)
+  // One summary line replaces the old stats grid + policy block.
+  assert.match(text, /0 台服务器 · 0 就绪 · 0 个工具/)
+  assert.ok(!text.includes('部署策略'), 'policy block removed')
 })
 
 await check('列表展示状态徽标、最近成功与错误摘要', async () => {
@@ -448,10 +449,17 @@ await check('列表展示状态徽标、最近成功与错误摘要', async () =
   const text = textOf(root)
   assert.match(text, /demo/)
   assert.match(text, /就绪/)
+  assert.match(text, /1 个工具/)
   assert.match(text, /HTTP_AUTH/)
-  assert.match(text, /尚未成功连接/)
-  assert.match(text, /最近成功/)
   assert.equal(calls.filter((call) => call.action === 'state').length, 0)
+
+  // Last-success lives in the details now, keeping the row to one meta line.
+  const disclosure = findAll(root, (node) => node.props?.className === 'mc-disclosure')[0]
+  assert.ok(disclosure, 'row disclosure')
+  disclosure.props.onClick()
+  rerender()
+  assert.match(textOf(root), /最近成功/)
+  assert.match(textOf(root), /调用 3（失败 0）/)
 })
 
 await check('添加弹窗：标题、表单/JSON 标签与基础字段', async () => {
@@ -583,12 +591,14 @@ await check('列表行动作：禁用 / 重试 / 测试 / 删除二次确认', a
   root = mount()
   await flush()
 
-  // Row surface: test + edit stay visible; the rest lives behind the overflow menu.
+  // Row surface: test + edit stay visible; the rest lives behind the row's
+  // overflow menu (the toolbar has its own menu with import/export/refresh).
+  const rowList = () => findAll(root, (node) => node.props?.className === 'mc-list')[0]
   assert.ok(byText(root, '测试连接'), 'test stays visible')
   assert.ok(byText(root, '编辑'), 'edit stays visible')
   assert.equal(byText(root, '禁用'), undefined, 'destructive actions are collapsed')
 
-  byAria(root, '更多操作').props.onClick()
+  byAria(rowList(), '更多操作').props.onClick()
   rerender()
   const disable = byText(root, '禁用')
   assert.ok(disable, 'disable inside overflow menu')
@@ -638,19 +648,16 @@ await check('搜索过滤与无结果态，图标为矢量而非 emoji', async (
 })
 
 await check('导入面板：逐条校验失败原样展示', async () => {
+  byAria(findAll(root, (node) => node.props?.className === 'mc-toolbar')[0], '更多操作').props.onClick()
+  rerender()
   const importButton = byText(root, '导入 JSON')
   importButton.props.onClick()
   await flush()
   const area = byPlaceholder(root, '{"mcpServers": {"filesystem": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]}}}')
-  if (!area) console.log('DEBUG import text:', textOf(root).slice(-400))
   assert.ok(area, 'import textarea')
   area.props.onChange({ target: { value: '{"mcpServers": {"bad name!": {"command": "x"}}}' } })
   rerender()
   const run = byText(root, '校验并导入')
-  if (!run) {
-    const hits = findAll(root, (node) => textOf(node).trim() === '校验并导入')
-    console.log('DEBUG matches:', hits.map((node) => JSON.stringify({ type: String(node.type), text: node.text, kids: (node.children ?? []).map((child) => child.type), onClick: typeof node.props?.onClick }).slice(0, 220)).join('\n'))
-  }
   run.props.onClick()
   await flush()
   const text = textOf(root)
@@ -660,6 +667,8 @@ await check('导入面板：逐条校验失败原样展示', async () => {
 })
 
 await check('导出面板生成所选结构', async () => {
+  byAria(findAll(root, (node) => node.props?.className === 'mc-toolbar')[0], '更多操作').props.onClick()
+  rerender()
   const exportButton = byText(root, '导出 JSON')
   exportButton.props.onClick()
   await flush()
