@@ -387,6 +387,33 @@ try {
     assert.ok(array.document.every((item) => item.serverName))
   })
 
+  await check('SSE 分帧兼容 CRLF 与跨块边界', async () => {
+    const { parseSseStream } = await import(pathToFileURL(path.join(ROOT, 'lib', 'transport-http.js')).href)
+    const events = []
+    // Modao answers with CRLF line endings; matching only "\n\n" drops every event.
+    const rest = parseSseStream(
+      'event: message\r\ndata: {"a":1}\r\n\r\nevent: message\r\ndata: {"b":2}\r\n\r\n',
+      (event) => events.push(event),
+    )
+    assert.equal(rest, '')
+    assert.equal(events.length, 2)
+    assert.equal(events[0].data, '{"a":1}')
+    assert.equal(events[1].data, '{"b":2}')
+
+    // A boundary split across two reads must not emit a partial event.
+    const first = parseSseStream('event: message\r\ndata: {"c":3}\r\n\r', (event) => events.push(event))
+    assert.equal(events.length, 2)
+    parseSseStream(`${first}\n`, (event) => events.push(event))
+    assert.equal(events.length, 3)
+    assert.equal(events[2].data, '{"c":3}')
+
+    // LF-only servers keep working.
+    const lf = []
+    parseSseStream('data: {"d":4}\n\n', (event) => lf.push(event))
+    assert.equal(lf.length, 1)
+    assert.equal(lf[0].data, '{"d":4}')
+  })
+
   await check('持久化：重新加载注册表', async () => {
     const onDisk = JSON.parse(await fs.readFile(path.join(DATA, 'registry.json'), 'utf8'))
     assert.equal(onDisk.version, 1)
