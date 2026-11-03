@@ -444,13 +444,12 @@ window.__ModuleLoader__.load({
       '.mc-disclosure:focus-visible{outline:var(--dsw-focus-ring-width) solid',
       'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:2px;border-radius:4px}',
       '.mc-tag-btn{display:inline-flex;align-items:center;height:22px;padding:0 9px;font:inherit;',
-      'font-size:12px;line-height:20px;cursor:pointer;color:var(--dsw-alias-label-secondary);',
-      'background:var(--dsw-alias-bg-layer-2);border:.5px solid var(--dsw-alias-border-l3);',
-      'border-radius:999px;transition:color .12s ease,border-color .12s ease,background-color .12s ease}',
-      '.mc-tag-btn:hover:not(:disabled){background:var(--dsw-alias-bg-layer-3);border-color:var(--dsw-alias-border-l4);',
-      'color:var(--dsw-alias-label-primary)}',
-      '.mc-tag-btn[data-tone="ok"]{color:var(--dsw-alias-state-success-primary,var(--dsw-alias-state-business-primary));',
-      'border-color:currentColor}',
+      'font-size:12px;line-height:20px;cursor:pointer;font-weight:500;',
+      'color:var(--dsw-alias-state-business-primary);',
+      'background:transparent;border:.5px solid currentColor;',
+      'border-radius:999px;transition:background-color .12s ease,color .12s ease}',
+      '.mc-tag-btn:hover:not(:disabled){background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-state-business-primary)}',
+      '.mc-tag-btn[data-tone="ok"]{color:var(--dsw-alias-state-success-primary,var(--dsw-alias-state-business-primary))}',
       '.mc-tag-btn:disabled{opacity:.55;cursor:default}',
       '.mc-chip{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:999px;',
       'font-size:12px;background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-secondary)}',
@@ -1598,6 +1597,9 @@ window.__ModuleLoader__.load({
             h('span', { className: 'mc-name' }, server.serverName),
           ),
           h(StateBadge, { state: server.state, label: server.stateLabel }),
+          server.toolCount > 0
+            ? h('span', { className: 'mc-chip' }, t('toolsCount', { count: server.toolCount }))
+            : null,
           server.config.transport !== 'stdio'
             ? h(
               'button',
@@ -1613,9 +1615,6 @@ window.__ModuleLoader__.load({
                 ? t('oauthPendingShort')
                 : server.oauth?.authorized ? t('oauthRevoke') : t('oauthAuthorize'),
             )
-            : null,
-          server.toolCount > 0
-            ? h('span', { className: 'mc-chip' }, t('toolsCount', { count: server.toolCount }))
             : null,
           h('span', { className: 'mc-spacer' }),
           h(

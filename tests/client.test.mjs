@@ -764,10 +764,19 @@ await check('必填校验：空名称点击保存给出红框与小字提示', a
 })
 
 await check('OAuth：卡片上的授权 / 取消授权按钮调用对应动作', async () => {
+  snapshot = {
+    ...snapshot,
+    servers: snapshot.servers.map((item) => (item.serverName === 'broken' ? { ...item, toolCount: 2 } : item)),
+  }
   root = mount()
   await flush()
   const listOf = () => findAll(root, (node) => node.props?.className === 'mc-list')[0]
   const httpCard = () => findAll(listOf(), (node) => node.props?.className === 'mc-item' && textOf(node).includes('broken'))[0]
+
+  // The pill sits to the right of the tools tag.
+  const cardText = textOf(httpCard())
+  assert.ok(cardText.indexOf('2 个工具') >= 0, 'tools tag rendered')
+  assert.ok(cardText.indexOf('2 个工具') < cardText.indexOf('授权'), 'authorize pill follows the tools tag')
 
   const authorize = byText(httpCard(), '授权')
   assert.ok(authorize, 'authorize tag button on http servers')
