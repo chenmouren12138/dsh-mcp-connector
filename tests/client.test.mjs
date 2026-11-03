@@ -851,7 +851,11 @@ await check('JSON 方言：mcpServers 包一层也能识别并原样输出', asy
   const fixed = JSON.parse(areaOf().props.value)
   assert.ok(fixed.mcpServers, 'wrapper preserved')
   assert.equal(fixed.mcpServers.figma.url, 'https://mcp.figma.com/mcp', 'url kept')
-  assert.ok(!('transport' in fixed.mcpServers.figma) || fixed.mcpServers.figma.transport !== 'stdio', 'not downgraded to stdio')
+  assert.equal(fixed.mcpServers.figma.type, 'streamable-http', 'kept the "type" key')
+  assert.ok(!('headers' in fixed.mcpServers.figma), 'no empty headers added')
+  assert.ok(!('args' in fixed.mcpServers.figma), 'no empty args added')
+  assert.ok(!('env' in fixed.mcpServers.figma), 'no empty env added')
+  assert.ok(!('cwd' in fixed.mcpServers.figma), 'no empty cwd added')
   assert.match(textOf(panelOf()), /已修复 \d+ 处/)
 
   // The form tab sees the same entry.

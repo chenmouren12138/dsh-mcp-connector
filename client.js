@@ -1117,6 +1117,16 @@ window.__ModuleLoader__.load({
         .join('\n')
     }
 
+    /** Drop empty optional fields so the document mirrors what people paste. */
+    function compactConfig(config) {
+      const output = { ...config }
+      if (Array.isArray(output.args) && output.args.length === 0) delete output.args
+      if (output.env && typeof output.env === 'object' && Object.keys(output.env).length === 0) delete output.env
+      if (typeof output.cwd === 'string' && output.cwd === '') delete output.cwd
+      if (output.headers && typeof output.headers === 'object' && Object.keys(output.headers).length === 0) delete output.headers
+      return output
+    }
+
     /** Wrapper keys the ecosystem uses around a `name → config` map. */
     const DIALECT_KEYS = ['mcpServers', 'servers', 'mcp']
 
@@ -1131,25 +1141,34 @@ window.__ModuleLoader__.load({
       if (!isPlainObject(input)) throw new Error('JSON 需要是一个对象')
       const keys = Object.keys(input)
       if (keys.length === 1 && DIALECT_KEYS.includes(keys[0]) && isPlainObject(input[keys[0]])) {
-        return { dialect: keys[0], map: input[keys[0]], wrapper: keys[0] }
+        const inner = input[keys[0]]
+        return {
+          dialect: keys[0],
+          map: inner,
+          wrapper: keys[0],
+          transportKey: transportKeyOf(inner),
+        }
       }
       // A config object uses these keys and has no name layer.
       if (keys.some((key) => ['transport', 'command', 'url', 'type', 'headers', 'args', 'env', 'cwd'].includes(key))) {
-        return { dialect: 'bare', map: input }
+        return { dialect: 'bare', map: input, transportKey: transportKeyOf(input) }
       }
       return { dialect: 'nameMap', map: input }
     }
 
     const CONFIG_KEYS = ['transport', 'command', 'url', 'type', 'headers', 'args', 'env', 'cwd']
+    const transportKeyOf = (config) => (isPlainObject(config) && config.type !== undefined && config.transport === undefined ? 'type' : 'transport')
     const isConfigLike = (value) => isPlainObject(value) && Object.keys(value).some((key) => CONFIG_KEYS.includes(key))
 
     /** Read a document into `{ draft, dialect, count }`; `count` counts named servers. */
     function readEntryDocument(input, preferredName) {
-      const { dialect, map, wrapper } = parseEntryDocument(input)
+      const { dialect, map, wrapper, transportKey } = parseEntryDocument(input)
+      const key = transportKey ?? 'transport'
       if (dialect === 'bare') {
         return {
           dialect: 'nameMap',
           count: 1,
+          transportKey: key,
           draft: draftOf({ serverName: preferredName || '', config: map, disabled: false }),
         }
       }
@@ -1159,23 +1178,31 @@ window.__ModuleLoader__.load({
         return {
           dialect,
           count: 1,
+          transportKey: key,
           draft: draftOf({ serverName: preferredName || wrapper || '', config: map, disabled: false }),
         }
       }
       const names = Object.keys(map).filter((key) => isPlainObject(map[key]))
       const chosen = preferredName && names.includes(preferredName) ? preferredName : names[0]
       const config = chosen === undefined ? map[''] ?? {} : map[chosen]
+      const entry = chosen === undefined ? map : map[chosen]
       return {
         dialect,
         count: names.length,
+        transportKey: transportKeyOf(entry),
         draft: draftOf({ serverName: chosen ?? '', config: config ?? {}, disabled: false }),
       }
     }
 
     /** Render a draft back in the shape the document used. */
-    function draftToEntry(draft, dialect = 'nameMap') {
+    function draftToEntry(draft, dialect = 'nameMap', transportKey = 'transport') {
       const name = (draft.serverName || 'mcp').trim()
-      const config = draftToConfig(draft)
+      let config = compactConfig(draftToConfig(draft))
+      // Keep `type` when the document used it (Figma, VS Code, Claude all do).
+      if (transportKey === 'type' && config.transport !== undefined) {
+        const { transport, ...rest } = config
+        config = { type: transport, ...rest }
+      }
       if (DIALECT_KEYS.includes(dialect)) return { [dialect]: { [name]: config } }
       return { [name]: config }
     }
@@ -1303,6 +1330,7 @@ window.__ModuleLoader__.load({
       const [jsonError, setJsonError] = useState('')
       const [jsonNotice, setJsonNotice] = useState('')
       const [jsonDialect, setJsonDialect] = useState('nameMap')
+      const [jsonTransportKey, setJsonTransportKey] = useState('transport')
       const [revealed, setRevealed] = useState({})
       // Rows are local state: an empty row is a legitimate editing state that the
       // serialized `headersText` cannot represent, so deriving them from the text
@@ -1322,7 +1350,7 @@ window.__ModuleLoader__.load({
         setErrors([])
         setToast('')
         setJsonError('')
-        setJsonText(JSON.stringify(draftToEntry(next, 'nameMap'), null, 2))
+        setJsonText(JSON.stringify(draftToEntry(next, 'nameMap', 'transport'), null, 2))
         setRowList(headerRows(next.headersText))
       }, [server, mode])
 
@@ -1385,11 +1413,13 @@ window.__ModuleLoader__.load({
       const formatJson = useCallback(() => {
         let parsed
         let dialect = jsonDialect
+        let transportKey = jsonTransportKey
         let repaired = 0
         try {
           const doc = readEntryDocument(JSON.parse(jsonText), draftRef.current?.serverName)
           parsed = doc.draft
           dialect = doc.dialect
+          transportKey = doc.transportKey ?? transportKey
         } catch (strictError) {
           let repairedText = ''
           try {
@@ -1398,6 +1428,7 @@ window.__ModuleLoader__.load({
             const doc = readEntryDocument(JSON.parse(repairedText), draftRef.current?.serverName)
             parsed = doc.draft
             dialect = doc.dialect
+            transportKey = doc.transportKey ?? transportKey
             repaired = repairCount(repair.notes)
           } catch {
             setJsonError(t('jsonInvalid', { message: strictError.message }))
@@ -1408,7 +1439,8 @@ window.__ModuleLoader__.load({
         setDraft({ ...parsed })
         setRowList(headerRows(parsed.headersText))
         setJsonDialect(dialect)
-        setJsonText(JSON.stringify(draftToEntry(parsed, dialect), null, 2))
+        setJsonTransportKey(transportKey)
+        setJsonText(JSON.stringify(draftToEntry(parsed, dialect, transportKey), null, 2))
         setJsonError('')
         setJsonNotice(repaired > 0 ? t('jsonRepaired', { count: repaired }) : t('jsonOptimized'))
         setTimeout(() => setJsonNotice(''), 3200).unref?.()
