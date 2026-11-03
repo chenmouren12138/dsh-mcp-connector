@@ -33,6 +33,7 @@ window.__ModuleLoader__.load({
       summary: '{servers} 台服务器 · {ready} 就绪 · {tools} 个工具',
       refreshed: '已刷新',
       matchCount: '匹配 {count} 台',
+      matchShort: '{count} 台',
       statServers: '服务器',
       statReady: '就绪',
       statTools: '工具',
@@ -208,6 +209,7 @@ window.__ModuleLoader__.load({
       summary: '{servers} servers · {ready} ready · {tools} tools',
       refreshed: 'Refreshed',
       matchCount: '{count} matched',
+      matchShort: '{count}',
       statServers: 'Servers',
       statReady: 'Ready',
       statTools: 'Tools',
@@ -579,8 +581,11 @@ window.__ModuleLoader__.load({
       '.mc-search{position:relative;display:flex;align-items:center;flex:1 1 220px;max-width:340px;min-width:0}',
       '.mc-search-icon{position:absolute;left:8px;color:var(--dsw-alias-label-tertiary);pointer-events:none}',
       '.mc-search-input{padding-left:28px;padding-right:28px;-webkit-appearance:none;appearance:none}',
+      '.mc-search-input[data-filtering="true"]{padding-right:66px}',
       '.mc-search-input::-webkit-search-cancel-button,.mc-search-input::-ms-clear{display:none}',
       '.mc-search-clear{position:absolute;right:1px}',
+      '.mc-search-count{position:absolute;right:26px;font-size:12px;line-height:18px;pointer-events:none;',
+      'color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}',
       '.mc-item-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
       '.mc-disclosure{display:inline-flex;align-items:center;gap:6px;padding:0;font:inherit;',
       'color:inherit;background:0 0;border:0;cursor:pointer;text-align:left}',
@@ -1886,6 +1891,7 @@ window.__ModuleLoader__.load({
       const [refreshNote, setRefreshNote] = useState('')
       const [feedback, setFeedback] = useState({})
       const feedbackTimers = useRef(new Map())
+      const searchRef = useRef(null)
       const alive = useRef(true)
       const lastFocus = useRef(null)
       const openEditor = useCallback((next) => {
@@ -1944,6 +1950,18 @@ window.__ModuleLoader__.load({
         }, FEEDBACK_MS)
         timer.unref?.()
         timers.set(id, timer)
+      }, [])
+
+      useEffect(() => {
+        const node = searchRef.current
+        if (!node || typeof node.addEventListener !== 'function') return undefined
+        const apply = () => setQuery(node.value)
+        node.addEventListener('input', apply)
+        node.addEventListener('compositionend', apply)
+        return () => {
+          node.removeEventListener('input', apply)
+          node.removeEventListener('compositionend', apply)
+        }
       }, [])
 
       const refreshNow = useCallback(async () => {
@@ -2081,11 +2099,13 @@ window.__ModuleLoader__.load({
             { className: 'mc-search' },
             h(Icon, { name: 'search', className: 'mc-search-icon' }),
             h('input', {
+              ref: searchRef,
               className: 'mc-input mc-search-input',
               type: 'text',
               'aria-label': t('search'),
               placeholder: t('searchPlaceholder'),
               value: query,
+              'data-filtering': query !== '' ? 'true' : undefined,
               spellCheck: false,
               onChange: (event) => setQuery(event.target.value),
               onInput: (event) => setQuery(event.currentTarget.value),
@@ -2097,6 +2117,9 @@ window.__ModuleLoader__.load({
                 }
               },
             }),
+            query !== ''
+              ? h('span', { className: 'mc-search-count', 'aria-live': 'polite' }, t('matchShort', { count: visible.length }))
+              : null,
             query !== ''
               ? h(
                 'button',

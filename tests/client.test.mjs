@@ -686,6 +686,10 @@ await check('搜索过滤与无结果态，图标为矢量而非 emoji', async (
   assert.ok(!textOf(list).includes('demo'), 'non-matching row hidden')
   assert.match(textOf(root), /匹配 1 台/, 'match count shown while filtering')
 
+  search.props.onChange({ target: { value: 'echo' } })
+  rerender()
+  assert.match(textOf(findAll(root, (node) => node.props?.className === 'mc-list')[0]), /demo/, 'matches tool names too')
+
   search.props.onChange({ target: { value: 'nothing-matches' } })
   rerender()
   assert.match(textOf(root), /没有匹配/)
