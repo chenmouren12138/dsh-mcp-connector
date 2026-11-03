@@ -116,6 +116,7 @@ window.__ModuleLoader__.load({
       fieldTimeout: '超时时间（毫秒，可选）',
       fieldTimeoutHint: '单次工具调用的最长等待时间，最小 1000 毫秒；留空用默认策略。',
       timeoutError: '超时时间至少 1000 毫秒，或留空使用默认。',
+      headerMaskedValue: '请求头「{name}」的值是掩码占位符（••••），请重新输入真实值。',
       namePlaceholder: '例如 github-search',
       agentNameHint: 'Agent 将看到 serverName：{name}',
       urlPlaceholder: 'https://example.com/mcp',
@@ -293,6 +294,7 @@ window.__ModuleLoader__.load({
       fieldTimeout: 'Timeout (ms, optional)',
       fieldTimeoutHint: 'Longest wait for one tool call, at least 1000 ms; leave blank for the default policy.',
       timeoutError: 'Use at least 1000 ms, or leave it blank for the default.',
+      headerMaskedValue: 'Header “{name}” still holds the mask placeholder (••••); enter the real value.',
       namePlaceholder: 'e.g. github-search',
       agentNameHint: 'Agents will see serverName: {name}',
       urlPlaceholder: 'https://example.com/mcp',
@@ -1233,9 +1235,13 @@ window.__ModuleLoader__.load({
         config: draftToConfig(draft),
       }), [draft])
 
+      const maskedHeader = (row) => /\u2022/.test(String(row.value ?? '')) || /^\*{3,}$/.test(String(row.value ?? ''))
+
       const runProbe = useCallback(async () => {
         setAttempted(true)
         const problems = Object.values(validateFields(draftRef.current, t)).filter(Boolean)
+        const masked = rows.find((row) => maskedHeader(row))
+        if (masked) problems.push(t('headerMaskedValue', { name: masked.name || '?' }))
         if (problems.length > 0) {
           setErrors(problems)
           return
@@ -1266,6 +1272,8 @@ window.__ModuleLoader__.load({
       const save = useCallback(async () => {
         setAttempted(true)
         const problems = Object.values(validateFields(draftRef.current, t)).filter(Boolean)
+        const masked = rows.find((row) => maskedHeader(row))
+        if (masked) problems.push(t('headerMaskedValue', { name: masked.name || '?' }))
         if (problems.length > 0) {
           setErrors(problems)
           return
@@ -1710,13 +1718,7 @@ window.__ModuleLoader__.load({
           className: 'mc-item',
           'data-tone': toneOf(server.state),
           'data-open': open ? 'true' : undefined,
-          'data-search': [
-            server.serverName,
-            server.config?.url ?? '',
-            server.config?.command ?? '',
-            ...(server.config?.args ?? []),
-            ...(server.tools ?? []).map((tool) => tool.publicName ?? tool.name),
-          ].join(' ').toLowerCase(),
+          'data-search': String(server.serverName ?? '').toLowerCase(),
         },
         h(
           'div',
@@ -2111,17 +2113,7 @@ window.__ModuleLoader__.load({
       const needle = query.trim().toLowerCase()
       const visible = needle === ''
         ? servers
-        : servers.filter((server) => {
-          const haystack = [
-            server.serverName,
-            server.stateLabel,
-            server.config?.url ?? '',
-            server.config?.command ?? '',
-            ...(server.config?.args ?? []),
-            ...(server.tools ?? []).map((tool) => tool.publicName ?? tool.name),
-          ].join(' ').toLowerCase()
-          return haystack.includes(needle)
-        })
+        : servers.filter((server) => String(server.serverName ?? '').toLowerCase().includes(needle))
 
       return h(
         'div',
@@ -2141,9 +2133,6 @@ window.__ModuleLoader__.load({
                 tools: stats.tools,
                 ready: stats.ready + stats.degraded,
               })
-              : null,
-            stats && query.trim() !== ''
-              ? h('span', { className: 'mc-refreshed' }, ` · ${t('matchCount', { count: visible.length })}`)
               : null,
             refreshNote ? h('span', { className: 'mc-refreshed' }, ` · ${refreshNote}`) : null,
           )
@@ -2175,9 +2164,6 @@ window.__ModuleLoader__.load({
                 }
               },
             }),
-            query !== ''
-              ? h('span', { className: 'mc-search-count', 'aria-live': 'polite' }, t('matchShort', { count: visible.length }))
-              : null,
             query !== ''
               ? h(
                 'button',

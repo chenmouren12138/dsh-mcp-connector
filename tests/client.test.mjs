@@ -684,11 +684,12 @@ await check('搜索过滤与无结果态，图标为矢量而非 emoji', async (
   const list = findAll(root, (node) => node.props?.className === 'mc-list')[0]
   assert.match(textOf(list), /broken/)
   assert.ok(!textOf(list).includes('demo'), 'non-matching row hidden')
-  assert.match(textOf(root), /匹配 1 台/, 'match count shown while filtering')
 
-  search.props.onChange({ target: { value: 'echo' } })
+  // Name-only matching: a substring that exists in the endpoint but not in any
+  // server name must not match (this is what made "m" hit every server).
+  search.props.onChange({ target: { value: 'https' } })
   rerender()
-  assert.match(textOf(findAll(root, (node) => node.props?.className === 'mc-list')[0]), /demo/, 'matches tool names too')
+  assert.match(textOf(root), /没有匹配/, 'endpoint text is not searched')
 
   search.props.onChange({ target: { value: 'nothing-matches' } })
   rerender()
