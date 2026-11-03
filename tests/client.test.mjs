@@ -623,35 +623,33 @@ await check('列表行动作：禁用 / 重试 / 测试 / 删除二次确认', a
   root = mount()
   await flush()
 
-  // Per-card actions: test, retry, enable/disable and edit are visible on the
-  // row itself; only delete stays behind the overflow menu.
+  // Per-card actions are icon buttons; the tooltip (title) carries the name.
   const rowList = () => findAll(root, (node) => node.props?.className === 'mc-list')[0]
-  assert.ok(byText(root, '测试连接'), 'test stays visible')
-  assert.ok(byText(root, '重试连接'), 'retry stays visible')
-  assert.ok(byText(root, '编辑'), 'edit stays visible')
-  const disable = byText(root, '禁用')
-  assert.ok(disable, 'disable is visible per card')
-  assert.equal(byText(root, '删除'), undefined, 'delete is still collapsed')
+  const card = () => findAll(rowList(), (node) => node.props?.className === 'mc-item')[0]
+  for (const label of ['测试连接', '重试连接', '禁用', '编辑', '删除']) {
+    const button = byAria(card(), label)
+    assert.ok(button, `${label} icon present`)
+    assert.equal(button.props.title, label, `${label} tooltip`)
+  }
+  const probeCard = () => findAll(rowList(), (node) => node.props?.className === 'mc-item' && textOf(node).includes('probe'))[0]
+  const disable = byAria(card(), '禁用')
   disable.props.onClick()
   await flush()
   assert.ok(calls.some((item) => item.action === 'setDisabled' && item.payload.disabled === true))
-  assert.match(textOf(root), /已停用：/, 'disabled hint appears on the card')
+  // The receipt lands on the card that produced it.
+  assert.match(textOf(card()), /已禁用：连接断开，配置保留/, 'card shows its own receipt')
 
-  const test = byText(findAll(root, (node) => node.props?.className === 'mc-list')[0], '测试连接')
+  const test = byAria(probeCard(), '测试连接')
   test.props.onClick()
   await flush()
   assert.ok(calls.some((item) => item.action === 'testConnection' && item.payload.id === 'srv-new'))
   assert.match(textOf(root), /连接有效|2025-06-18/)
 
-  // Delete lives in the overflow menu, behind a second confirmation.
-  byAria(rowList(), '更多操作').props.onClick()
+  // Delete asks for confirmation with check / cancel icons.
+  byAria(probeCard(), '删除').props.onClick()
   rerender()
-  const remove = byText(root, '删除')
-  remove.props.onClick()
-  await flush()
-  assert.match(textOf(root), /确认删除/)
-  const confirm = byText(root, '确认删除')
-  confirm.props.onClick()
+  assert.ok(byAria(probeCard(), '确认删除'), 'confirm icon')
+  byAria(probeCard(), '确认删除').props.onClick()
   await flush()
   assert.ok(calls.some((item) => item.action === 'removeServer'))
   assert.match(textOf(root), /已删除/)
@@ -665,11 +663,11 @@ await check('搜索过滤与无结果态，图标为矢量而非 emoji', async (
 
   const search = findAll(root, (node) => node.props?.['aria-label'] === '搜索服务器')[0]
   assert.ok(search, 'search input')
-  search.props.onChange({ target: { value: 'probe' } })
+  search.props.onChange({ target: { value: 'broken' } })
   rerender()
   const list = findAll(root, (node) => node.props?.className === 'mc-list')[0]
-  assert.match(textOf(list), /probe/)
-  assert.ok(!textOf(list).includes('broken'), 'non-matching row hidden')
+  assert.match(textOf(list), /broken/)
+  assert.ok(!textOf(list).includes('demo'), 'non-matching row hidden')
 
   search.props.onChange({ target: { value: 'nothing-matches' } })
   rerender()
@@ -683,7 +681,7 @@ await check('编辑弹窗与添加弹窗同构：标题、名称锁定、动作�
   root = mount()
   await flush()
   const list = findAll(root, (node) => node.props?.className === 'mc-list')[0]
-  byText(list, '编辑').props.onClick()
+  byAria(list, '编辑').props.onClick()
   await flush()
   const dialog = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
   assert.ok(dialog, 'edit dialog')

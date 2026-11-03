@@ -527,6 +527,8 @@ window.__ModuleLoader__.load({
       '.mc-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px}',
       '.mc-btn-icon{width:30px;padding:0}',
       '.mc-icon-btn{width:28px;height:28px}',
+      '.mc-icon-danger{color:var(--dsw-alias-state-error-primary)}',
+      '.mc-item .mc-note{margin:0}',
       '.mc-search{position:relative;display:flex;align-items:center;flex:1 1 220px;max-width:340px;min-width:0}',
       '.mc-search-icon{position:absolute;left:8px;color:var(--dsw-alias-label-tertiary);pointer-events:none}',
       '.mc-search-input{padding-left:28px;padding-right:28px}',
@@ -821,6 +823,9 @@ window.__ModuleLoader__.load({
       reload: 'M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5',
       warning: 'M12 4l9 16H3L12 4Zm0 6v5m0 3h.01',
       eye: 'M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Zm10 2.6a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2Z',
+      plug: 'M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0V8ZM12 17v4',
+      power: 'M12 3v9M6.6 6.6a8 8 0 1 0 11 0',
+      pencil: 'M4 20h4L19 9l-4-4L4 16v4Zm10-14 4 4',
       eyeOff: 'M3 3l18 18M10.6 6.1A10.6 10.6 0 0 1 12 6c6.4 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7.4A17.4 17.4 0 0 0 2 12s3.6 6 10 6a10.4 10.4 0 0 0 4-.8',
     }
 
@@ -1630,9 +1635,8 @@ window.__ModuleLoader__.load({
      * compete for attention. The row name itself is the details disclosure, so the
      * whole left side is one large target instead of a tiny chevron.
      */
-    function ServerItem({ server, t, locale, busy, onAction }) {
+    function ServerItem({ server, t, locale, busy, onAction, feedback }) {
       const [open, setOpen] = useState(false)
-      const [more, setMore] = useState(false)
       const [confirming, setConfirming] = useState(false)
       const [copied, setCopied] = useState('')
       const lastSuccess = formatTime(server.lastSuccessAt, locale)
@@ -1673,61 +1677,95 @@ window.__ModuleLoader__.load({
             ? h('span', { className: 'mc-chip' }, t('toolsCount', { count: server.toolCount }))
             : null,
           h('span', { className: 'mc-spacer' }),
+          h('span', { className: 'mc-spacer' }),
           h(
             'button',
             {
               type: 'button',
-              className: 'mc-btn mc-btn-sm',
+              className: 'mc-icon-btn',
+              title: t('test'),
+              'aria-label': t('test'),
               disabled: busy !== '',
               onClick: () => onAction('test', server),
             },
-            busy === 'test' ? t('testing') : t('test'),
-          ),
-          h(
-            'button',
-            {
-              type: 'button',
-              className: 'mc-btn mc-btn-sm',
-              disabled: busy !== '' || server.disabled,
-              onClick: () => onAction('retry', server),
-            },
-            busy === 'retry' ? t('retrying') : t('retry'),
-          ),
-          h(
-            'button',
-            {
-              type: 'button',
-              className: 'mc-btn mc-btn-sm',
-              disabled: busy !== '',
-              onClick: () => onAction(server.disabled ? 'enable' : 'disable', server),
-            },
-            server.disabled ? t('enable') : t('disable'),
-          ),
-          h(
-            'button',
-            {
-              type: 'button',
-              className: 'mc-btn mc-btn-sm',
-              disabled: busy !== '',
-              onClick: () => onAction('edit', server),
-            },
-            t('edit'),
+            h(Icon, { name: 'plug' }),
           ),
           h(
             'button',
             {
               type: 'button',
               className: 'mc-icon-btn',
-              'aria-label': t('moreActions'),
-              'aria-expanded': more ? 'true' : 'false',
-              title: t('moreActions'),
-              onClick: () => {
-                setMore((value) => !value)
-                if (more) setConfirming(false)
-              },
+              title: t('retry'),
+              'aria-label': t('retry'),
+              disabled: busy !== '' || server.disabled,
+              onClick: () => onAction('retry', server),
             },
-            h(Icon, { name: 'more' }),
+            h(Icon, { name: 'retry' }),
           ),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'mc-icon-btn',
+              title: server.disabled ? t('enable') : t('disable'),
+              'aria-label': server.disabled ? t('enable') : t('disable'),
+              disabled: busy !== '',
+              onClick: () => onAction(server.disabled ? 'enable' : 'disable', server),
+            },
+            h(Icon, { name: 'power' }),
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'mc-icon-btn',
+              title: t('edit'),
+              'aria-label': t('edit'),
+              disabled: busy !== '',
+              onClick: () => onAction('edit', server),
+            },
+            h(Icon, { name: 'pencil' }),
+          ),
+          confirming
+            ? [
+              h(
+                'button',
+                {
+                  key: 'confirm',
+                  type: 'button',
+                  className: 'mc-icon-btn mc-icon-danger',
+                  title: t('confirmRemove'),
+                  'aria-label': t('confirmRemove'),
+                  disabled: busy !== '',
+                  onClick: () => onAction('remove', server),
+                },
+                h(Icon, { name: 'check' }),
+              ),
+              h(
+                'button',
+                {
+                  key: 'cancel',
+                  type: 'button',
+                  className: 'mc-icon-btn',
+                  title: t('cancel'),
+                  'aria-label': t('cancel'),
+                  onClick: () => setConfirming(false),
+                },
+                h(Icon, { name: 'close' }),
+              ),
+            ]
+            : h(
+              'button',
+              {
+                type: 'button',
+                className: 'mc-icon-btn',
+                title: t('remove'),
+                'aria-label': t('remove'),
+                disabled: busy !== '',
+                onClick: () => setConfirming(true),
+              },
+              h(Icon, { name: 'trash' }),
+            ),
         ),
         h(
           'div',
@@ -1746,46 +1784,10 @@ window.__ModuleLoader__.load({
         Array.isArray(server.notes) && server.notes.length > 0
           ? h('p', { className: 'mc-hint' }, server.notes.join('；'))
           : null,
-        more
-          ? h(
-            'div',
-            { className: 'mc-more' },
-            confirming
-              ? [
-                h(
-                  'button',
-                  {
-                    key: 'confirm',
-                    type: 'button',
-                    className: 'mc-btn mc-btn-sm mc-btn-danger',
-                    disabled: busy !== '',
-                    onClick: () => onAction('remove', server),
-                  },
-                  t('confirmRemove'),
-                ),
-                h(
-                  'button',
-                  {
-                    key: 'cancel',
-                    type: 'button',
-                    className: 'mc-btn mc-btn-sm',
-                    onClick: () => setConfirming(false),
-                  },
-                  t('cancel'),
-                ),
-              ]
-              : h(
-                'button',
-                {
-                  type: 'button',
-                  className: 'mc-btn mc-btn-sm mc-btn-danger',
-                  disabled: busy !== '',
-                  onClick: () => setConfirming(true),
-                },
-                t('remove'),
-              ),
-          )
+        feedback
+          ? h(Note, { kind: feedback.kind }, feedback.message)
           : null,
+
         open
           ? h(
             'div',
@@ -2049,6 +2051,7 @@ window.__ModuleLoader__.load({
       const [toast, setToast] = useState('')
       const [probeReport, setProbeReport] = useState(null)
       const [query, setQuery] = useState('')
+      const [feedback, setFeedback] = useState({})
       const [toolsMenu, setToolsMenu] = useState(false)
       const alive = useRef(true)
       const lastFocus = useRef(null)
@@ -2090,6 +2093,9 @@ window.__ModuleLoader__.load({
         setBusyId({ id: server.id, action })
         setToast('')
         setProbeReport(null)
+        // Per-card receipt: the result of an action belongs to the card it was run
+        // on, not to a page-level banner the user has to associate back to a row.
+        setFeedback((current) => ({ ...current, [server.id]: undefined }))
         try {
           if (action === 'edit') {
             openEditor({ mode: 'edit', server })
@@ -2100,21 +2106,27 @@ window.__ModuleLoader__.load({
             setProbeReport({ for: server.serverName, report })
             return
           }
+          let message = ''
           if (action === 'retry') {
             const data = await request('retryServer', { id: server.id })
-            setToast(data?.receipt?.message ?? '')
+            message = data?.receipt?.message ?? ''
           }
           if (action === 'enable' || action === 'disable') {
             const data = await request('setDisabled', { id: server.id, disabled: action === 'disable' })
-            setToast(data?.receipt?.message ?? '')
+            message = data?.receipt?.message ?? ''
           }
           if (action === 'remove') {
             const data = await request('removeServer', { id: server.id })
+            // The card disappears, so a removed row reports on the page instead.
             setToast(data?.receipt?.message ?? '')
+            await refresh()
+            return
           }
+          setFeedback((current) => ({ ...current, [server.id]: { kind: 'ok', message } }))
           await refresh()
         } catch (error) {
-          setToast(`${error.code ?? 'ACTION_FAILED'} · ${error.phase ?? 'config'} · ${error.message}`)
+          const message = `${error.code ?? 'ACTION_FAILED'} · ${error.phase ?? 'config'} · ${error.message}`
+          setFeedback((current) => ({ ...current, [server.id]: { kind: 'error', message } }))
         } finally {
           setBusyId(null)
         }
@@ -2140,6 +2152,9 @@ window.__ModuleLoader__.load({
                 warnings: mounting.notes ?? [],
               },
           })
+        }
+        if (result?.receipt?.id) {
+          setFeedback((current) => ({ ...current, [result.receipt.id]: { kind: 'ok', message: result.receipt.message ?? '' } }))
         }
         closeEditor()
         await refresh()
@@ -2335,6 +2350,7 @@ window.__ModuleLoader__.load({
                 locale,
                 busy: busyId?.id === server.id ? busyId.action : '',
                 onAction: act,
+                feedback: feedback[server.id],
               })),
             ),
       )
