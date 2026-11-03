@@ -763,6 +763,36 @@ await check('必填校验：空名称点击保存给出红框与小字提示', a
   assert.match(textOf(panel), /必填/, 'small required hint shown')
 })
 
+await check('JSON 标签：一键优化格式化、保存基于 JSON 文本、且有高亮层', async () => {
+  root = mount()
+  await flush()
+  byText(root, '添加 MCP').props.onClick()
+  await flush()
+  const panelOf = () => findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
+  const areaOf = () => findAll(panelOf(), (node) => node.type === 'textarea' && node.props?.['aria-label'] === 'JSON')[0]
+
+  byText(panelOf(), 'JSON').props.onClick()
+  await flush()
+  areaOf().props.onChange({ target: { value: '{"probe":{"command":"node","args":["x"]}}' } })
+  rerender()
+
+  // code colours are painted by a layer under the transparent textarea
+  const layer = findAll(panelOf(), (node) => node.props?.className === 'mc-json-hl')[0]
+  assert.ok(layer, 'highlight layer rendered')
+  assert.ok(findAll(layer, (node) => String(node.props?.className ?? '').includes('mc-tok-key')).length > 0, 'keys coloured')
+
+  byText(panelOf(), '一键优化').props.onClick()
+  rerender()
+  assert.match(areaOf().props.value, /\n {2}"probe"/, 'pretty-printed and wrapped with the server name')
+
+  byText(panelOf(), '添加 MCP').props.onClick()
+  await flush()
+  const call = calls.filter((item) => item.action === 'addServer').at(-1)
+  assert.ok(call, 'save works from the JSON tab')
+  assert.equal(call.payload.serverName, 'probe')
+  assert.equal(call.payload.config.command, 'node')
+})
+
 await check('OAuth：卡片上的授权 / 取消授权按钮调用对应动作', async () => {
   snapshot = {
     ...snapshot,

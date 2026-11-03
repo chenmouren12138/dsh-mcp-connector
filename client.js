@@ -97,6 +97,8 @@ window.__ModuleLoader__.load({
       fieldTimeoutHint: '单次工具调用的最长等待时间，最小 1000 毫秒；留空用默认策略。',
       timeoutError: '超时时间至少 1000 毫秒，或留空使用默认。',
       headerMaskedValue: '请求头「{name}」的值是掩码占位符（••••），请重新输入真实值。',
+      jsonOptimize: '一键优化',
+      jsonOptimized: '已整理为标准格式',
       namePlaceholder: '例如 github-search',
       agentNameHint: 'Agent 将看到 serverName：{name}',
       urlPlaceholder: 'https://example.com/mcp',
@@ -212,6 +214,8 @@ window.__ModuleLoader__.load({
       fieldTimeoutHint: 'Longest wait for one tool call, at least 1000 ms; leave blank for the default policy.',
       timeoutError: 'Use at least 1000 ms, or leave it blank for the default.',
       headerMaskedValue: 'Header “{name}” still holds the mask placeholder (••••); enter the real value.',
+      jsonOptimize: 'Tidy up',
+      jsonOptimized: 'Formatted',
       namePlaceholder: 'e.g. github-search',
       agentNameHint: 'Agents will see serverName: {name}',
       urlPlaceholder: 'https://example.com/mcp',
@@ -457,6 +461,22 @@ window.__ModuleLoader__.load({
       '.mc-details{display:flex;flex-direction:column;gap:10px;padding:10px 12px;',
       'border:.5px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm);',
       'background:var(--dsw-alias-bg-layer-2)}',
+      '.mc-json{position:relative;display:block;border:.5px solid var(--dsw-alias-border-l2);',
+      'border-radius:var(--dsw-radius-sm);background:var(--dsw-alias-bg-base);overflow:hidden}',
+      '.mc-json .mc-json-hl{position:absolute;inset:0;margin:0;padding:10px 12px;overflow:auto;',
+      'pointer-events:none;box-sizing:border-box;white-space:pre-wrap;word-break:break-all;',
+      'font:12.5px/19px ui-monospace,SFMono-Regular,monospace;color:var(--dsw-alias-label-secondary)}',
+      '.mc-json .mc-textarea{position:relative;z-index:1;box-sizing:border-box;display:block;',
+      'width:100%;min-height:260px;margin:0;padding:10px 12px;border:0;border-radius:0;resize:vertical;',
+      'background:transparent;color:transparent;caret-color:var(--dsw-alias-label-primary);',
+      'font:12.5px/19px ui-monospace,SFMono-Regular,monospace;white-space:pre-wrap;word-break:break-all}',
+      '.mc-json .mc-textarea:focus-visible{outline:none}',
+      '.mc-json:focus-within{border-color:var(--dsw-alias-border-l4)}',
+      '.mc-tok-key{color:var(--dsw-alias-state-business-primary)}',
+      '.mc-tok-str{color:var(--dsw-alias-state-success-primary,var(--dsw-alias-state-business-primary))}',
+      '.mc-tok-num{color:var(--dsw-alias-state-warning-primary,var(--dsw-alias-label-primary))}',
+      '.mc-tok-lit{color:var(--dsw-alias-state-error-primary)}',
+      '.mc-tok-punc{color:var(--dsw-alias-label-tertiary)}',
       '.mc-pre{margin:0;max-height:220px;overflow:auto;padding:8px 10px;',
       'border-radius:var(--dsw-radius-sm);background:var(--dsw-alias-bg-base);',
       'font:12px/17px ui-monospace,SFMono-Regular,monospace;color:var(--dsw-alias-label-secondary)}',
@@ -765,6 +785,30 @@ window.__ModuleLoader__.load({
         return
       }
       if (typeof window !== 'undefined' && typeof window.open === 'function') window.open(url, '_blank', 'noopener')
+    }
+
+    /** Split JSON text into coloured tokens for the highlight layer. */
+    function jsonTokens(text) {
+      const tokens = []
+      const pattern = /("(?:[^"\\]|\\.)*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|\b(true|false|null)\b|([{}\[\],:])/g
+      let last = 0
+      let match
+      while ((match = pattern.exec(text)) !== null) {
+        if (match.index > last) tokens.push({ kind: 'plain', text: text.slice(last, match.index) })
+        if (match[1] !== undefined) {
+          tokens.push({ kind: match[2] ? 'key' : 'str', text: match[1] })
+          if (match[2]) tokens.push({ kind: 'punc', text: match[2] })
+        } else if (match[3] !== undefined) {
+          tokens.push({ kind: 'num', text: match[3] })
+        } else if (match[4] !== undefined) {
+          tokens.push({ kind: 'lit', text: match[4] })
+        } else if (match[5] !== undefined) {
+          tokens.push({ kind: 'punc', text: match[5] })
+        }
+        last = pattern.lastIndex
+      }
+      if (last < text.length) tokens.push({ kind: 'plain', text: text.slice(last) })
+      return tokens
     }
 
     /** One discovered tool row: raw name plus the exact public name agents see. */
@@ -1089,21 +1133,52 @@ window.__ModuleLoader__.load({
       // The handlers read the live draft from this ref, never from a closure.
       const draftRef = useRef(draft)
       draftRef.current = draft
-      const buildPayload = useCallback(() => ({
-        serverName: draft.serverName.trim(),
+      const buildPayload = useCallback((source = draftRef.current) => ({
+        serverName: String(source.serverName ?? '').trim(),
         // Saving always means "connect": the form has no disabled switch, so a
         // server edited here comes back enabled even if import left it stopped.
         disabled: false,
-        config: draftToConfig(draft),
-      }), [draft])
+        config: draftToConfig(source),
+      }), [])
 
       const maskedHeader = (row) => /\u2022/.test(String(row.value ?? '')) || /^\*{3,}$/.test(String(row.value ?? ''))
 
+      /**
+       * In the JSON tab the editable text is the source of truth, so save/probe
+       * parse it instead of validating the stale form draft. Returns the parsed
+       * draft, or undefined when the text is not usable yet.
+       */
+      const draftFromJson = useCallback(() => {
+        try {
+          return entryToDraft(JSON.parse(jsonText))
+        } catch (error) {
+          setJsonError(t('jsonInvalid', { message: error.message }))
+          return undefined
+        }
+      }, [jsonText, t])
+
+      /** Pretty-print and normalise the JSON tab content. */
+      const formatJson = useCallback(() => {
+        try {
+          const parsed = entryToDraft(JSON.parse(jsonText))
+          setDraft({ ...parsed })
+          setRowList(headerRows(parsed.headersText))
+          setJsonText(JSON.stringify(draftToEntry(parsed), null, 2))
+          setJsonError('')
+          setStatus(t('jsonOptimized'))
+          setTimeout(() => setStatus(''), 2000).unref?.()
+        } catch (error) {
+          setJsonError(t('jsonInvalid', { message: error.message }))
+        }
+      }, [jsonText, t])
+
       const runProbe = useCallback(async () => {
         setAttempted(true)
-        const problems = Object.values(validateFields(draftRef.current, t)).filter(Boolean)
+        const source = tab === 'json' ? draftFromJson() : draftRef.current
+        if (!source) return
+        const problems = Object.values(validateFields(source, t)).filter(Boolean)
         const masked = rows.find((row) => maskedHeader(row))
-        if (masked) problems.push(t('headerMaskedValue', { name: masked.name || '?' }))
+        if (masked && tab !== 'json') problems.push(t('headerMaskedValue', { name: masked.name || '?' }))
         if (problems.length > 0) {
           setErrors(problems)
           return
@@ -1129,13 +1204,15 @@ window.__ModuleLoader__.load({
           setStatus('')
           setBusy('')
         }
-      }, [buildPayload, draft, t])
+      }, [buildPayload, draftFromJson, tab, t])
 
       const save = useCallback(async () => {
         setAttempted(true)
-        const problems = Object.values(validateFields(draftRef.current, t)).filter(Boolean)
+        const source = tab === 'json' ? draftFromJson() : draftRef.current
+        if (!source) return
+        const problems = Object.values(validateFields(source, t)).filter(Boolean)
         const masked = rows.find((row) => maskedHeader(row))
-        if (masked) problems.push(t('headerMaskedValue', { name: masked.name || '?' }))
+        if (masked && tab !== 'json') problems.push(t('headerMaskedValue', { name: masked.name || '?' }))
         if (problems.length > 0) {
           setErrors(problems)
           return
@@ -1145,7 +1222,7 @@ window.__ModuleLoader__.load({
         setBusy('save')
         setToast('')
         try {
-          const payload = buildPayload()
+          const payload = buildPayload(source)
           const result = mode === 'edit' && server
             ? await request('updateServer', { id: server.id, ...payload })
             : await request('addServer', payload)
@@ -1157,7 +1234,7 @@ window.__ModuleLoader__.load({
           setStatus('')
           setBusy('')
         }
-      }, [buildPayload, draft, mode, onSaved, server, t])
+      }, [buildPayload, draftFromJson, mode, onSaved, server, tab, t])
 
       const switchTab = useCallback((next) => {
         if (next === 'json') {
@@ -1247,14 +1324,44 @@ window.__ModuleLoader__.load({
               ? h(
                 'div',
                 { className: 'mc-field' },
-                h('textarea', {
-                  className: 'mc-textarea',
-                  style: { minHeight: '260px' },
-                  'aria-label': t('tabJson'),
-                  spellCheck: false,
-                  value: jsonText,
-                  onChange: (event) => applyJson(event.target.value),
-                }),
+                h(
+                  'div',
+                  { className: 'mc-field-head' },
+                  h('label', { className: 'mc-label' }, t('tabJson')),
+                  h(
+                    'button',
+                    { type: 'button', className: 'mc-link-btn', onClick: formatJson },
+                    t('jsonOptimize'),
+                  ),
+                ),
+                h(
+                  'div',
+                  { className: 'mc-json' },
+                  h(
+                    'pre',
+                    { className: 'mc-json-hl', 'aria-hidden': 'true' },
+                    jsonTokens(jsonText).map((token, index) => h(
+                      'span',
+                      { key: index, className: `mc-tok mc-tok-${token.kind}` },
+                      token.text,
+                    )),
+                    '\n',
+                  ),
+                  h('textarea', {
+                    className: 'mc-textarea',
+                    'aria-label': t('tabJson'),
+                    spellCheck: false,
+                    value: jsonText,
+                    onChange: (event) => applyJson(event.target.value),
+                    onScroll: (event) => {
+                      const layer = event.currentTarget?.previousSibling
+                      if (layer) {
+                        layer.scrollTop = event.currentTarget.scrollTop
+                        layer.scrollLeft = event.currentTarget.scrollLeft
+                      }
+                    },
+                  }),
+                ),
                 jsonError
                   ? h('p', { className: 'mc-hint mc-err' }, jsonError)
                   : h('p', { className: 'mc-hint' }, t('jsonHint')),
