@@ -336,7 +336,7 @@ window.__ModuleLoader__.load({
       '.mc-list-editor{list-style:none;margin:0;padding:0}',
       '.mc-list-editor .mc-panel{margin-top:2px}',
       '.mc-editor-standalone{margin:0 0 10px}',
-      '.mc-scroll{overflow:auto;overscroll-behavior:contain;min-height:0}',
+      '.mc-scroll{overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;min-height:0}',
       '.mc-list{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}',
       '.mc-item{display:flex;flex-direction:column;gap:8px;padding:12px 14px;',
       'border:.5px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-md);',
@@ -2325,8 +2325,10 @@ window.__ModuleLoader__.load({
       const filterTextRef = useRef(null)
       const alive = useRef(true)
 
-      // The list scrolls inside the viewport, so the header above it never moves
-      // and needs no background of its own.
+      // The list scrolls inside the settings panel: measure the panel that actually
+      // scrolls (or the viewport when nothing does), then cap the list to the space
+      // left below the header. That keeps the header still and puts the scrollbar
+      // on the list edge instead of the page edge.
       useEffect(() => {
         const host = typeof window === 'undefined' ? undefined : window
         if (!host || typeof host.addEventListener !== 'function') return undefined
@@ -2334,15 +2336,37 @@ window.__ModuleLoader__.load({
           const node = scrollRef.current
           if (!node || typeof node.getBoundingClientRect !== 'function') return
           const top = node.getBoundingClientRect().top
-          const height = host.innerHeight
           if (typeof top !== 'number' || Number.isNaN(top)) return
-          if (typeof height !== 'number' || Number.isNaN(height)) return
-          node.style.maxHeight = `${Math.max(180, height - top - 24)}px`
+
+          // Walk up to the element that owns the scrollbar, if there is one.
+          let panel
+          let parent = typeof node.parentElement === 'object' ? node.parentElement : null
+          while (parent && parent !== document.documentElement) {
+            const style = typeof host.getComputedStyle === 'function' ? host.getComputedStyle(parent) : null
+            if (style && /(auto|scroll)/.test(style.overflowY) && parent.clientHeight > 0) {
+              panel = parent
+              break
+            }
+            parent = parent.parentElement
+          }
+
+          const bottom = panel
+            ? panel.getBoundingClientRect().bottom - (Number.parseFloat(host.getComputedStyle(panel).paddingBottom) || 0)
+            : host.innerHeight
+          if (typeof bottom !== 'number' || Number.isNaN(bottom)) return
+          node.style.maxHeight = `${Math.max(180, bottom - Math.max(0, top) - 8)}px`
         }
+
         fit()
         host.addEventListener('resize', fit)
+        let observer
+        if (typeof host.ResizeObserver === 'function' && scrollRef.current?.parentElement) {
+          observer = new host.ResizeObserver(fit)
+          observer.observe(scrollRef.current.parentElement)
+        }
         return () => {
           if (typeof host.removeEventListener === 'function') host.removeEventListener('resize', fit)
+          observer?.disconnect?.()
         }
       }, [typeFilter, query, snapshot])
       const lastFocus = useRef(null)
