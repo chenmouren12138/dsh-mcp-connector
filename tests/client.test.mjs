@@ -449,133 +449,129 @@ await check('列表展示状态徽标、最近成功与错误摘要', async () =
   assert.equal(calls.filter((call) => call.action === 'state').length, 0)
 })
 
-await check('点击「添加服务器」打开表单', async () => {
-  const button = byText(root, '添加服务器')
-  assert.ok(button, 'add button present')
-  button.props.onClick()
+await check('添加弹窗：标题、表单/JSON 标签与基础字段', async () => {
+  root = mount()
   await flush()
-  const text = textOf(root)
-  assert.match(text, /编辑服务器|添加服务器/)
-  assert.ok(byLabel(root, '服务器名（工具命名空间）'), 'server name field')
-  assert.ok(byLabel(root, '命令'), 'command field')
+  byText(root, '添加服务器').props.onClick()
+  await flush()
+  const dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  assert.ok(dialog, 'dialog rendered')
+  assert.equal(dialog.props.role, 'dialog')
+  assert.equal(dialog.props['aria-modal'], 'true')
+  assert.match(textOf(dialog), /添加自定义 MCP/)
+  assert.ok(byText(dialog, '表单'), 'form tab')
+  assert.ok(byText(dialog, 'JSON'), 'json tab')
+  assert.ok(byLabel(dialog, '服务器名（工具命名空间）'), 'name field')
+  assert.ok(byLabel(dialog, '传输类型'), 'transport field')
+  assert.ok(byLabel(dialog, '超时时间（毫秒，可选）'), 'timeout field')
+  assert.ok(byLabel(dialog, '命令'), 'stdio command field')
+  assert.ok(byText(dialog, '添加 MCP'), 'primary action')
+  assert.ok(byText(dialog, '取消'), 'cancel action')
 })
 
 await check('草稿测试连接返回结构化失败', async () => {
-  const nameInput = byLabel(root, '服务器名（工具命名空间）')
-  nameInput.props.onChange({ target: { value: 'probe' } })
-  const commandInput = byLabel(root, '命令')
-  commandInput.props.onChange({ target: { value: 'nope' } })
+  let dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  byLabel(dialog, '服务器名（工具命名空间）').props.onChange({ target: { value: 'probe' } })
+  byLabel(dialog, '命令').props.onChange({ target: { value: 'nope' } })
   rerender()
-  // The row actions also say "测试连接"; scope the click to the editor panel.
-  const editorPanel = findAll(root, (node) => node.props?.className === 'mc-panel' && node.props?.['aria-label'] === '添加服务器')[0]
-  assert.ok(editorPanel, 'editor panel')
-  const testButton = byText(editorPanel, '测试连接')
-  testButton.props.onClick()
+  dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  byText(dialog, '测试连接').props.onClick()
   await flush()
-  const text = textOf(root)
+  const text = textOf(findAll(root, (node) => node.props?.className === 'mc-dialog')[0])
   assert.match(text, /连接失败/)
   assert.match(text, /COMMAND_NOT_FOUND/)
   assert.match(text, /config/)
 })
 
-await check('保存调用 addServer 并展示挂载回执', async () => {
-  const save = byText(root, '保存')
-  save.props.onClick()
-  await flush()
-  const call = calls.find((item) => item.action === 'addServer')
-  assert.ok(call, 'addServer called')
-  assert.equal(call.payload.serverName, 'probe')
-  assert.equal(call.payload.config.command, 'nope')
-  const text = textOf(root)
-  assert.match(text, /已添加服务器/)
-  assert.match(text, /mcp__probe__echo|echo/)
-})
-
-await check('鉴权行：头名只读、令牌掩码、绑定为凭据引用', async () => {
-  // Open a fresh add editor and switch it to Streamable HTTP.
-  byText(root, '添加服务器').props.onClick()
-  await flush()
-  const transport = byLabel(root, '传输方式')
-  transport.props.onChange({ target: { value: 'streamable-http' } })
+await check('请求头行：新增、存为凭据、删除', async () => {
+  let dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  byLabel(dialog, '传输类型').props.onChange({ target: { value: 'streamable-http' } })
   rerender()
-  byLabel(root, '服务器名（工具命名空间）').props.onChange({ target: { value: 'modao' } })
-  byLabel(root, '端点地址').props.onChange({ target: { value: 'https://modao.cc/agent-py/ai/mcp' } })
+  dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  byLabel(dialog, '服务地址').props.onChange({ target: { value: 'https://example.com/mcp' } })
+  rerender()
+  dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  assert.match(textOf(dialog), /还没有请求头/)
+
+  byText(dialog, '+ 添加 Header').props.onClick()
+  rerender()
+  dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  const nameInput = findAll(dialog, (node) => node.type === 'input' && node.props?.['aria-label'] === 'Header 名称')[0]
+  const valueInput = findAll(dialog, (node) => node.type === 'input' && node.props?.['aria-label'] === '值')[0]
+  assert.ok(nameInput, 'header name input')
+  assert.ok(valueInput, 'header value input')
+
+  nameInput.props.onChange({ target: { value: 'modao-token' } })
+  rerender()
+  dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  findAll(dialog, (node) => node.type === 'input' && node.props?.['aria-label'] === '值')[0]
+    .props.onChange({ target: { value: 'sekret-token' } })
   rerender()
 
-  // Left side is a fixed library, not free text.
-  const headerSelect = findAll(root, (node) => node.type === 'select' && node.props?.['aria-label'] === '请求头')[0]
-  assert.ok(headerSelect, 'auth header select')
-  assert.equal(headerSelect.props.value, 'modao-token')
-  const options = findAll(headerSelect, (node) => node.type === 'option').map((node) => node.props.children)
-  assert.deepEqual(options, ['modao-token', 'Authorization', 'X-Api-Key', 'X-Auth-Token'])
-  assert.equal(findAll(root, (node) => node.type === 'input' && node.props?.['aria-label'] === '请求头').length, 0)
-
-  // Right side is a masked input by default, with an explicit reveal toggle.
-  let tokenInput = findAll(root, (node) => node.type === 'input' && node.props?.['aria-label'] === '令牌')[0]
-  assert.ok(tokenInput, 'token input')
-  assert.equal(tokenInput.props.type, 'password')
-  tokenInput.props.onChange({ target: { value: 'sekret-token' } })
-  rerender()
-  byText(root, '显示').props.onClick()
-  rerender()
-  tokenInput = findAll(root, (node) => node.type === 'input' && node.props?.['aria-label'] === '令牌')[0]
-  assert.equal(tokenInput.props.type, 'text')
-
-  // Binding writes the credential and leaves only a reference in the draft.
-  byText(root, '存入凭据并绑定').props.onClick()
+  dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  byText(dialog, '🔑').props.onClick()
   await flush()
   const call = calls.filter((item) => item.action === 'setCredential').at(-1)
   assert.ok(call, 'setCredential called')
-  assert.equal(call.payload.ref, 'MCP_MODAO_MODAO_TOKEN')
+  assert.equal(call.payload.ref, 'MCP_PROBE_MODAO_TOKEN')
   assert.equal(call.payload.value, 'sekret-token')
-  const text = textOf(root)
-  assert.match(text, /\$\{credential:MCP_MODAO_MODAO_TOKEN\}/)
-  // After binding the input is gone: the value lives only in the credential store.
-  assert.equal(findAll(root, (node) => node.type === 'input' && node.props?.['aria-label'] === '令牌').length, 0)
-  assert.match(text, /已绑定 MCP_MODAO_MODAO_TOKEN|已存入凭据库/)
 
-  // Close the editor so later scenarios start from the list.
-  const editorPanel = findAll(root, (node) => node.props?.className === 'mc-panel' && node.props?.['aria-label'] === '添加服务器')[0]
-  byText(editorPanel, '取消').props.onClick()
+  dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  const locked = findAll(dialog, (node) => node.type === 'input' && node.props?.['aria-label'] === '值' && node.props.readOnly === true)[0]
+  assert.ok(locked, 'bound row shows a masked value')
+  assert.match(String(locked.props.value), /••••/)
+
+  byText(dialog, '🗑').props.onClick()
+  rerender()
+  assert.match(textOf(findAll(root, (node) => node.props?.className === 'mc-dialog')[0]), /还没有请求头/)
+})
+
+await check('JSON 标签：合法内容回写表单，非法给出提示', async () => {
+  let dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  byText(dialog, 'JSON').props.onClick()
+  rerender()
+  dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  const area = findAll(dialog, (node) => node.type === 'textarea' && node.props?.['aria-label'] === 'JSON')[0]
+  assert.ok(area, 'json textarea')
+  area.props.onChange({
+    target: { value: JSON.stringify({ mymcp: { transport: 'stdio', command: 'node', args: ['x'] } }, null, 2) },
+  })
+  rerender()
+  byText(findAll(root, (node) => node.props?.className === 'mc-dialog')[0], '表单').props.onClick()
+  rerender()
+  dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  const nameField = findAll(dialog, (node) => node.type === 'input' && node.props?.['aria-label'] === '服务器名（工具命名空间）')[0]
+  assert.equal(nameField.props.value, 'mymcp')
+  assert.equal(findAll(dialog, (node) => node.type === 'input' && node.props?.['aria-label'] === '命令')[0].props.value, 'node')
+
+  byText(dialog, 'JSON').props.onClick()
+  rerender()
+  findAll(root, (node) => node.type === 'textarea' && node.props?.['aria-label'] === 'JSON')[0]
+    .props.onChange({ target: { value: '{oops' } })
+  rerender()
+  assert.match(textOf(findAll(root, (node) => node.props?.className === 'mc-dialog')[0]), /JSON 不合法/)
+  // Invalid JSON keeps the tab open on purpose; close the sheet for the next case.
+  byText(findAll(root, (node) => node.props?.className === 'mc-dialog')[0], '取消').props.onClick()
   await flush()
 })
 
-await check('每台 MCP 只有一个鉴权头，其他请求头默认收起', async () => {
-  // A fresh mount: the mini runtime keeps hook state per path, so reopening an
-  // editor at the same path would otherwise inherit the previous draft.
+await check('添加 MCP 调用 addServer 并展示挂载回执', async () => {
+  // Fresh mount: the mini runtime keeps hook state per path, so a dialog reopened
+  // at the same path would otherwise inherit the previous tab and draft.
   root = mount()
   await flush()
   byText(root, '添加服务器').props.onClick()
   await flush()
-  byLabel(root, '传输方式').props.onChange({ target: { value: 'streamable-http' } })
+  let dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  byLabel(dialog, '服务器名（工具命名空间）').props.onChange({ target: { value: 'probe' } })
+  byLabel(dialog, '命令').props.onChange({ target: { value: 'node' } })
   rerender()
-  byLabel(root, '服务器名（工具命名空间）').props.onChange({ target: { value: 'single' } })
-  byLabel(root, '端点地址').props.onChange({ target: { value: 'https://example.com/mcp' } })
-  rerender()
-
-  // Exactly one header input: the token field. No free-form headers editor.
-  const tokenFields = findAll(root, (node) => node.type === 'input' && node.props?.['aria-label'] === '令牌')
-  assert.equal(tokenFields.length, 1)
-  assert.equal(findAll(root, (node) => node.type === 'textarea' && node.props?.['aria-label'] === '其他请求头').length, 0)
-
-  // The advanced toggle reports zero extras and reveals the editor on demand.
-  const toggle = byText(root, '高级：其他请求头（0）')
-  assert.ok(toggle, 'advanced toggle')
-  assert.equal(toggle.props['aria-expanded'], 'false')
-  toggle.props.onClick()
-  rerender()
-  const area = findAll(root, (node) => node.type === 'textarea' && node.props?.['aria-label'] === '其他请求头')[0]
-  assert.ok(area, 'advanced headers editor')
-  area.props.onChange({ target: { value: 'X-Tenant: acme' } })
-  rerender()
-  // While open the toggle reads "hide"; collapsing reports the extra header count.
-  byText(root, '收起其他请求头').props.onClick()
-  rerender()
-  assert.match(textOf(root), /高级：其他请求头（1）/)
-
-  const editorPanel = findAll(root, (node) => node.props?.className === 'mc-panel' && node.props?.['aria-label'] === '添加服务器')[0]
-  byText(editorPanel, '取消').props.onClick()
+  byText(findAll(root, (node) => node.props?.className === 'mc-dialog')[0], '添加 MCP').props.onClick()
   await flush()
+  const call = calls.filter((item) => item.action === 'addServer').at(-1)
+  assert.ok(call, 'addServer called')
+  assert.equal(call.payload.config.command, 'node')
+  assert.match(textOf(root), /已添加服务器/)
 })
 
 await check('列表行动作：禁用 / 重试 / 测试 / 删除二次确认', async () => {

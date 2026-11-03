@@ -82,9 +82,31 @@ window.__ModuleLoader__.load({
       editorAdd: '添加服务器',
       editorEdit: '编辑服务器',
       editorHint: '保存后只热更新这一条连接，插件本身不重挂。',
+      dialogAdd: '添加自定义 MCP',
+      dialogEdit: '编辑 MCP',
+      dialogSubAdd: '配置保存在运行时注册表',
+      dialogSubEdit: '只热更新这一条连接，插件本身不重挂；保存位置',
+      dialogClose: '关闭',
+      tabForm: '表单',
+      tabJson: 'JSON',
+      jsonHint: '可直接编辑该服务器的 JSON；切回表单会应用合法内容。',
+      jsonInvalid: 'JSON 不合法：{message}',
+      actionAdd: '添加 MCP',
+      actionSave: '保存 MCP',
+      fieldTimeout: '超时时间（毫秒，可选）',
+      fieldTimeoutHint: '单次工具调用的最长等待时间，最小 1000 毫秒；留空用默认策略。',
+      namePlaceholder: '例如 github-search',
+      urlPlaceholder: 'https://example.com/mcp',
+      headerAdd: '+ 添加 Header',
+      headerName: 'Header 名称',
+      headerValue: '值',
+      headerRemove: '删除该请求头',
+      headerCredential: '存为凭据',
+      headerChange: '更换值',
+      headerEmpty: '还没有请求头。鉴权头用「+ 添加 Header」新增，值可用 🔑 存进凭据库。',
       fieldName: '服务器名（工具命名空间）',
       fieldNameHint: '匹配 [A-Za-z0-9_-]{1,32}；作为工具前缀后不可修改，改名请删除后重建。',
-      fieldTransport: '传输方式',
+      fieldTransport: '传输类型',
       fieldCommand: '命令',
       fieldCommandHint: '可执行文件名或绝对路径，例如 npx、node、python。',
       fieldArgs: '参数',
@@ -92,7 +114,7 @@ window.__ModuleLoader__.load({
       fieldEnv: '环境变量',
       fieldEnvHint: '每行 KEY=VALUE。凭据会被脱敏显示。',
       fieldCwd: '工作目录',
-      fieldUrl: '端点地址',
+      fieldUrl: '服务地址',
       fieldUrlHint: 'Streamable HTTP 端点，例如 https://example.com/mcp。',
       fieldHeaders: '其他请求头',
       fieldHeadersHint: '每行 KEY: VALUE。鉴权头在上面单独管理；这里放租户、版本这类非敏感头。密钥也可写成 ${credential:名称}。',
@@ -219,6 +241,28 @@ window.__ModuleLoader__.load({
       editorAdd: 'Add server',
       editorEdit: 'Edit server',
       editorHint: 'Saving swaps only this connection; the plugin itself is not remounted.',
+      dialogAdd: 'Add custom MCP',
+      dialogEdit: 'Edit MCP',
+      dialogSubAdd: 'Saved in the runtime registry',
+      dialogSubEdit: 'Only this connection is swapped; saved in',
+      dialogClose: 'Close',
+      tabForm: 'Form',
+      tabJson: 'JSON',
+      jsonHint: 'Edit this server as JSON; switching back to the form applies whatever parses.',
+      jsonInvalid: 'Invalid JSON: {message}',
+      actionAdd: 'Add MCP',
+      actionSave: 'Save MCP',
+      fieldTimeout: 'Timeout (ms, optional)',
+      fieldTimeoutHint: 'Longest wait for one tool call, at least 1000 ms; leave blank for the default policy.',
+      namePlaceholder: 'e.g. github-search',
+      urlPlaceholder: 'https://example.com/mcp',
+      headerAdd: '+ Add header',
+      headerName: 'Header',
+      headerValue: 'Value',
+      headerRemove: 'Remove this header',
+      headerCredential: 'Store as credential',
+      headerChange: 'Replace value',
+      headerEmpty: 'No headers yet. Add an auth header with “+ Add header”; the 🔑 button stores its value in credentials.',
       fieldName: 'Server name (tool namespace)',
       fieldNameHint: 'Matches [A-Za-z0-9_-]{1,32}; immutable once it prefixes tool names — rename by delete + create.',
       fieldTransport: 'Transport',
@@ -398,6 +442,36 @@ window.__ModuleLoader__.load({
       '.mc-cred-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}',
       '.mc-cred-ok{color:var(--dsw-alias-state-business-primary)}',
       '.mc-cred-miss{color:var(--dsw-alias-label-tertiary)}',
+      // Modal sheet for add/edit: overlay + card, tabs, header rows, footer.
+      '.mc-overlay{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-start;',
+      'justify-content:center;padding:6vh 16px;overflow:auto;background:rgba(0,0,0,.45)}',
+      '.mc-dialog{display:flex;flex-direction:column;width:100%;max-width:660px;overflow:hidden;',
+      'background:var(--dsw-alias-bg-layer-1);border:.5px solid var(--dsw-alias-border-l3);',
+      'border-radius:var(--dsw-radius-md);box-shadow:0 18px 48px rgba(0,0,0,.28)}',
+      '.mc-dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:16px 18px 8px}',
+      '.mc-dialog-heading{display:flex;flex-direction:column;gap:4px;min-width:0}',
+      '.mc-dialog-title{margin:0;font-size:16px;font-weight:600;line-height:24px}',
+      '.mc-dialog-sub{margin:0;font-size:12px;line-height:18px;word-break:break-all;color:var(--dsw-alias-label-tertiary)}',
+      '.mc-icon-btn{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;',
+      'padding:0;font-size:13px;cursor:pointer;color:var(--dsw-alias-label-tertiary);',
+      'background:transparent;border:0;border-radius:var(--dsw-radius-sm);flex:none}',
+      '.mc-icon-btn:hover:not(:disabled){background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-primary)}',
+      '.mc-icon-btn:disabled{opacity:.4;cursor:default}',
+      '.mc-tabs{display:flex;gap:18px;padding:0 18px;border-bottom:.5px solid var(--dsw-alias-border-l2)}',
+      '.mc-tab{position:relative;padding:8px 1px 9px;font:inherit;font-size:13px;cursor:pointer;',
+      'background:0 0;border:0;color:var(--dsw-alias-label-tertiary)}',
+      '.mc-tab[data-active="true"]{color:var(--dsw-alias-label-primary)}',
+      '.mc-tab[data-active="true"]:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;',
+      'border-radius:2px 2px 0 0;background:var(--dsw-alias-label-primary)}',
+      '.mc-dialog-body{padding:16px 18px;overflow:auto;max-height:min(66vh,560px)}',
+      '.mc-form{display:flex;flex-direction:column;gap:14px}',
+      '.mc-field-head{display:flex;align-items:center;justify-content:space-between;gap:12px}',
+      '.mc-link-btn{padding:0;font:inherit;font-size:12px;cursor:pointer;color:var(--dsw-alias-link);background:0 0;border:0}',
+      '.mc-link-btn:hover{text-decoration:underline}',
+      '.mc-header-row{display:grid;grid-template-columns:1fr 1fr auto auto;gap:6px;align-items:center;margin-top:6px}',
+      '.mc-input-locked{color:var(--dsw-alias-label-tertiary);background:var(--dsw-alias-bg-layer-1)}',
+      '.mc-dialog-foot{display:flex;align-items:center;gap:8px;padding:12px 18px;',
+      'border-top:.5px solid var(--dsw-alias-border-l2)}',
       '@media (max-width:560px){.mc-grid{grid-template-columns:1fr}}',
       '@media (prefers-reduced-motion:reduce){.mc-dot{animation:none}}',
     ].join('')
@@ -714,11 +788,13 @@ window.__ModuleLoader__.load({
       cwd: '',
       url: '',
       headersText: '',
+      timeoutMs: '',
       disabled: false,
     }
 
     function draftOf(server) {
       const config = server.config ?? {}
+      const timeoutMs = typeof config.toolCallTimeoutMs === 'number' ? String(config.toolCallTimeoutMs) : ''
       if (config.transport === 'stdio') {
         return {
           serverName: server.serverName,
@@ -729,6 +805,7 @@ window.__ModuleLoader__.load({
           cwd: config.cwd ?? '',
           url: '',
           headersText: '',
+          timeoutMs,
           disabled: Boolean(server.disabled),
         }
       }
@@ -741,11 +818,14 @@ window.__ModuleLoader__.load({
         cwd: '',
         url: config.url ?? '',
         headersText: formatPairLines(config.headers, ':'),
+        timeoutMs,
         disabled: Boolean(server.disabled),
       }
     }
 
     function draftToConfig(draft) {
+      const timeout = Number(draft.timeoutMs)
+      const timeoutField = Number.isFinite(timeout) && timeout >= 1000 ? { toolCallTimeoutMs: timeout } : {}
       if (draft.transport === 'stdio') {
         return {
           transport: 'stdio',
@@ -753,13 +833,49 @@ window.__ModuleLoader__.load({
           args: parseArgs(draft.argsText),
           env: parsePairLines(draft.envText, '='),
           cwd: draft.cwd.trim(),
+          ...timeoutField,
         }
       }
       return {
         transport: draft.transport,
         url: draft.url.trim(),
         headers: parsePairLines(draft.headersText, ':'),
+        ...timeoutField,
       }
+    }
+
+    /** Editable header rows ⇄ the single headersText the draft carries. */
+    function headerRows(text) {
+      const rows = []
+      for (const line of String(text ?? '').split(/\r?\n/)) {
+        const parsed = splitHeaderLine(line)
+        if (parsed) rows.push({ name: parsed.name, value: parsed.value })
+      }
+      return rows
+    }
+
+    function rowsToText(rows) {
+      return rows
+        .filter((row) => String(row.name ?? '').trim() !== '' || String(row.value ?? '').trim() !== '')
+        .map((row) => `${String(row.name ?? '').trim()}: ${String(row.value ?? '').trim()}`)
+        .join('\n')
+    }
+
+    /** The one-entry JSON document the JSON tab shows (Claude Desktop dialect). */
+    function draftToEntry(draft) {
+      const name = (draft.serverName || 'mcp').trim()
+      return { [name]: draftToConfig(draft) }
+    }
+
+    /** Parse either `{ name: config }` or a bare config back into a draft. */
+    function entryToDraft(input) {
+      if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('JSON 需要是一个对象')
+      const keys = Object.keys(input)
+      const first = keys[0]
+      if (first !== undefined && input[first] && typeof input[first] === 'object' && !Array.isArray(input[first])) {
+        return draftOf({ serverName: first, config: input[first], disabled: false })
+      }
+      return draftOf({ serverName: '', config: input, disabled: false })
     }
 
     function validateDraft(draft, t) {
@@ -770,19 +886,34 @@ window.__ModuleLoader__.load({
       return errors
     }
 
-    function Editor({ mode, server, allowedTransports, t, onCancel, onSaved, credentialRefs, onApplied }) {
+    /**
+     * Add / edit dialog: a modal sheet with form and JSON tabs, an editable header
+     * row list, and the pre-flight probe next to the save action.
+     *
+     * The credential affordance lives on the header row itself: a stored secret is
+     * shown as its `${credential:REF}` reference, and a typed literal can be moved
+     * into the DSH credential store with one click.
+     */
+    function ServerDialog({ mode, server, allowedTransports, t, onCancel, onSaved, credentialRefs, onApplied, dataDir }) {
       const [draft, setDraft] = useState(() => (server ? draftOf(server) : { ...EMPTY_DRAFT }))
+      const [tab, setTab] = useState('form')
       const [busy, setBusy] = useState('')
       const [errors, setErrors] = useState([])
       const [probe, setProbe] = useState(null)
       const [toast, setToast] = useState('')
-      const [authHeader, setAuthHeader] = useState(() => detectAuthHeader(server ? draftOf(server).headersText : ''))
-      const [authValue, setAuthValue] = useState('')
-      const [authVisible, setAuthVisible] = useState(false)
-      const [authNote, setAuthNote] = useState('')
-      const [advanced, setAdvanced] = useState(false)
+      const [jsonText, setJsonText] = useState('')
+      const [jsonError, setJsonError] = useState('')
+      const [credBusy, setCredBusy] = useState('')
+      // Rows are local state: an empty row is a legitimate editing state that the
+      // serialized `headersText` cannot represent, so deriving them from the text
+      // would drop a freshly added blank row.
+      const [rows, setRowList] = useState(() => headerRows(draft.headersText))
       const nameRef = useRef(null)
       const patch = useCallback((next) => setDraft((current) => ({ ...current, ...next })), [])
+      const commitRows = useCallback((next) => {
+        setRowList(next)
+        patch({ headersText: rowsToText(next) })
+      }, [patch])
 
       useEffect(() => {
         const next = server ? draftOf(server) : { ...EMPTY_DRAFT }
@@ -790,69 +921,26 @@ window.__ModuleLoader__.load({
         setProbe(null)
         setErrors([])
         setToast('')
-        const header = detectAuthHeader(next.headersText)
-        setAuthHeader(header)
-        setAuthValue('')
-        setAuthVisible(false)
-        setAuthNote('')
-        // One auth header per server; only an existing configuration with extra
-        // headers opens the advanced editor, so nothing is silently hidden.
-        setAdvanced(countOtherHeaders(next.headersText, header) > 0)
+        setJsonError('')
+        setJsonText(JSON.stringify(draftToEntry(next), null, 2))
+        setRowList(headerRows(next.headersText))
       }, [server, mode])
 
       useEffect(() => {
         if (mode === 'add') nameRef.current?.focus()
       }, [mode])
 
-      /**
-       * Bind the auth header to a credential reference: the token goes to the DSH
-       * credential store, the draft (and, when editing, the live connection) keeps
-       * only `${credential:REF}`. The value never enters the registry.
-       */
-      const applyAuth = useCallback(async () => {
-        if (authValue === '') {
-          setAuthNote(t('authNeedValue'))
-          return
+      // Esc closes the sheet; a modal without a keyboard exit is a trap.
+      useEffect(() => {
+        const onKey = (event) => {
+          if (event?.key === 'Escape') onCancel?.()
         }
-        const name = (draft.serverName || server?.serverName || '').trim()
-        if (name === '') {
-          setAuthNote(t('authNeedName'))
-          return
+        if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+          window.addEventListener('keydown', onKey)
+          return () => window.removeEventListener('keydown', onKey)
         }
-        const ref = credentialRefName(name, authHeader)
-        const headersText = writeHeaderValue(draft.headersText, authHeader, `\${credential:${ref}}`)
-        setBusy('auth')
-        setAuthNote('')
-        try {
-          await request('setCredential', { ref, value: authValue })
-          setAuthValue('')
-          setAuthVisible(false)
-          if (mode === 'edit' && server?.id) {
-            const config = draftToConfig({ ...draft, headersText })
-            const result = await request('updateServer', {
-              id: server.id,
-              serverName: name,
-              disabled: draft.disabled,
-              config,
-            })
-            patch({ headersText })
-            setAuthNote(t('authApplied'))
-            onApplied?.(result)
-          } else {
-            patch({ headersText })
-            setAuthNote(t('authBound'))
-          }
-        } catch (error) {
-          setAuthNote(`${error.code ?? 'ACTION_FAILED'} · ${error.message}`)
-        } finally {
-          setBusy('')
-        }
-      }, [authHeader, authValue, draft, mode, onApplied, patch, server, t])
-
-      const boundValue = readHeaderValue(draft.headersText, authHeader)
-      const boundRef = credentialRefOf(boundValue)
-      const boundStatus = credentialRefs?.find((item) => item.ref === boundRef)
-      const extraHeaderCount = countOtherHeaders(draft.headersText, authHeader)
+        return undefined
+      }, [onCancel])
 
       const transports = allowedTransports.length > 0 ? allowedTransports : ['stdio', 'streamable-http']
 
@@ -875,7 +963,15 @@ window.__ModuleLoader__.load({
           const result = await request('testConnection', buildPayload())
           setProbe(result)
         } catch (error) {
-          setProbe({ ok: false, error: { code: error.code ?? 'ACTION_FAILED', phase: error.phase ?? 'config', message: error.message, detail: error.detail } })
+          setProbe({
+            ok: false,
+            error: {
+              code: error.code ?? 'ACTION_FAILED',
+              phase: error.phase ?? 'config',
+              message: error.message,
+              detail: error.detail,
+            },
+          })
         } finally {
           setBusy('')
         }
@@ -904,253 +1000,394 @@ window.__ModuleLoader__.load({
         }
       }, [buildPayload, draft, mode, onSaved, server, t])
 
+      /** Store one row's literal value in the credential store, then keep the ref. */
+      const bindCredential = useCallback(async (index) => {
+        const row = rows[index]
+        if (!row || row.value.trim() === '') {
+          setErrors([t('authNeedValue')])
+          return
+        }
+        const name = (draft.serverName || server?.serverName || '').trim()
+        if (name === '') {
+          setErrors([t('authNeedName')])
+          return
+        }
+        const ref = credentialRefName(name, row.name || 'TOKEN')
+        setCredBusy(String(index))
+        setErrors([])
+        try {
+          await request('setCredential', { ref, value: row.value.trim() })
+          const next = [...rows]
+          next[index] = { ...row, value: `\${credential:${ref}}` }
+          commitRows(next)
+          setToast(t('authBound', { ref }))
+        } catch (error) {
+          setErrors([`${error.code ?? 'ACTION_FAILED'} · ${error.message}`])
+        } finally {
+          setCredBusy('')
+        }
+      }, [commitRows, draft.serverName, rows, server, t])
+
+      const switchTab = useCallback((next) => {
+        if (next === 'json') {
+          setJsonText(JSON.stringify(draftToEntry(draft), null, 2))
+          setJsonError('')
+          setTab('json')
+          return
+        }
+        try {
+          const parsed = JSON.parse(jsonText)
+          const nextDraft = entryToDraft(parsed)
+          setDraft({ ...nextDraft })
+          setRowList(headerRows(nextDraft.headersText))
+          setJsonError('')
+          setTab('form')
+        } catch (error) {
+          setJsonError(t('jsonInvalid', { message: error.message }))
+        }
+      }, [draft, jsonText, t])
+
+      const applyJson = useCallback((text) => {
+        setJsonText(text)
+        try {
+          const parsed = JSON.parse(text)
+          const nextDraft = entryToDraft(parsed)
+          setDraft({ ...nextDraft })
+          setRowList(headerRows(nextDraft.headersText))
+          setJsonError('')
+        } catch (error) {
+          setJsonError(t('jsonInvalid', { message: error.message }))
+        }
+      }, [t])
+
       return h(
-        'section',
-        { className: 'mc-panel', 'aria-label': mode === 'edit' ? t('editorEdit') : t('editorAdd') },
+        'div',
+        { className: 'mc-overlay', role: 'presentation' },
         h(
-          'div',
-          { className: 'mc-panel-head' },
-          h('h3', { className: 'mc-panel-title' }, mode === 'edit' ? t('editorEdit') : t('editorAdd')),
-          h('p', { className: 'mc-hint' }, t('editorHint')),
-        ),
-        h(
-          'div',
-          { className: 'mc-grid' },
+          'section',
+          {
+            className: 'mc-dialog',
+            role: 'dialog',
+            'aria-modal': 'true',
+            'aria-label': mode === 'edit' ? t('dialogEdit') : t('dialogAdd'),
+          },
           h(
-            Field,
-            { label: t('fieldName'), hint: t('fieldNameHint') },
-            h('input', {
-              ref: nameRef,
-              className: 'mc-input',
-              value: draft.serverName,
-              disabled: mode === 'edit',
-              spellCheck: false,
-              autoComplete: 'off',
-              onChange: (event) => patch({ serverName: event.target.value }),
-            }),
-          ),
-          h(
-            Field,
-            { label: t('fieldTransport') },
+            'header',
+            { className: 'mc-dialog-head' },
             h(
-              'select',
-              {
-                className: 'mc-select',
-                value: draft.transport,
-                onChange: (event) => patch({ transport: event.target.value }),
-              },
-              transports.map((transport) => h(
-                'option',
-                { key: transport, value: transport },
-                transport === 'stdio'
-                  ? t('transportStdio')
-                  : transport === 'sse' ? t('transportSse') : t('transportHttp'),
-              )),
+              'div',
+              { className: 'mc-dialog-heading' },
+              h('h3', { className: 'mc-dialog-title' }, mode === 'edit' ? t('dialogEdit') : t('dialogAdd')),
+              h('p', { className: 'mc-dialog-sub' }, mode === 'edit' ? t('dialogSubEdit') : t('dialogSubAdd'), dataDir ? ` ${dataDir}` : ''),
+            ),
+            h(
+              'button',
+              { type: 'button', className: 'mc-icon-btn', 'aria-label': t('dialogClose'), onClick: onCancel },
+              '✕',
             ),
           ),
-          draft.transport === 'stdio'
-            ? h(
-              Field,
-              { label: t('fieldCommand'), hint: t('fieldCommandHint'), full: true },
-              h('input', {
-                className: 'mc-input',
-                value: draft.command,
-                spellCheck: false,
-                autoComplete: 'off',
-                onChange: (event) => patch({ command: event.target.value }),
-              }),
-            )
-            : null,
-          draft.transport === 'stdio'
-            ? h(
-              Field,
-              { label: t('fieldArgs'), hint: t('fieldArgsHint'), full: true },
-              h('textarea', {
-                className: 'mc-textarea',
-                value: draft.argsText,
-                spellCheck: false,
-                onChange: (event) => patch({ argsText: event.target.value }),
-              }),
-            )
-            : null,
-          draft.transport === 'stdio'
-            ? h(
-              Field,
-              { label: t('fieldEnv'), hint: t('fieldEnvHint') },
-              h('textarea', {
-                className: 'mc-textarea',
-                value: draft.envText,
-                spellCheck: false,
-                onChange: (event) => patch({ envText: event.target.value }),
-              }),
-            )
-            : null,
-          draft.transport === 'stdio'
-            ? h(
-              Field,
-              { label: t('fieldCwd') },
-              h('input', {
-                className: 'mc-input',
-                value: draft.cwd,
-                spellCheck: false,
-                onChange: (event) => patch({ cwd: event.target.value }),
-              }),
-            )
-            : null,
-          draft.transport !== 'stdio'
-            ? h(
-              Field,
-              { label: t('fieldUrl'), hint: t('fieldUrlHint'), full: true },
-              h('input', {
-                className: 'mc-input',
-                value: draft.url,
-                spellCheck: false,
-                autoComplete: 'off',
-                onChange: (event) => patch({ url: event.target.value }),
-              }),
-            )
-            : null,
-          draft.transport !== 'stdio'
-            ? h(
-              'div',
-              { className: 'mc-adv' },
-              h(
-                'button',
-                {
-                  type: 'button',
-                  className: 'mc-btn mc-btn-sm',
-                  'aria-expanded': advanced ? 'true' : 'false',
-                  onClick: () => setAdvanced((value) => !value),
-                },
-                advanced ? t('advHide') : t('advShow', { count: extraHeaderCount }),
-              ),
-              advanced
-                ? h('textarea', {
-                  className: 'mc-textarea',
-                  'aria-label': t('fieldHeaders'),
-                  placeholder: 'X-Tenant: acme',
-                  value: draft.headersText,
-                  spellCheck: false,
-                  onChange: (event) => patch({ headersText: event.target.value }),
-                })
-                : null,
-              advanced ? h('p', { className: 'mc-hint' }, t('fieldHeadersHint')) : null,
-            )
-            : null,
-        ),
-        h(
-          'label',
-          { className: 'mc-check' },
-          h('input', {
-            type: 'checkbox',
-            checked: draft.disabled,
-            onChange: (event) => patch({ disabled: event.target.checked }),
-          }),
-          t('fieldDisabled'),
-        ),
-        draft.transport !== 'stdio'
-          ? h(
+          h(
             'div',
-            { className: 'mc-cred' },
-            h('h4', { className: 'mc-cred-title' }, t('authTitle')),
-            h('p', { className: 'mc-hint' }, t('authHint')),
+            { className: 'mc-tabs', role: 'tablist' },
             h(
-              'div',
-              { className: 'mc-cred-row' },
-              h(
-                'select',
-                {
-                  className: 'mc-select',
-                  style: { maxWidth: '180px' },
-                  'aria-label': t('authHeaderLabel'),
-                  value: authHeader,
-                  onChange: (event) => {
-                    setAuthHeader(event.target.value)
-                    setAuthValue('')
-                    setAuthNote('')
-                  },
-                },
-                AUTH_HEADER_LIBRARY.map((name) => h('option', { key: name, value: name }, name)),
-              ),
-              boundRef
-                ? h('code', { className: 'mc-mono' }, `\${credential:${boundRef}}`)
-                : h('input', {
-                  className: 'mc-input',
-                  style: { maxWidth: '260px' },
-                  type: authVisible ? 'text' : 'password',
-                  'aria-label': t('authValueLabel'),
-                  placeholder: t('authValueLabel'),
-                  value: authValue,
+              'button',
+              {
+                type: 'button',
+                role: 'tab',
+                className: 'mc-tab',
+                'data-active': tab === 'form' ? 'true' : undefined,
+                'aria-selected': tab === 'form' ? 'true' : 'false',
+                onClick: () => switchTab('form'),
+              },
+              t('tabForm'),
+            ),
+            h(
+              'button',
+              {
+                type: 'button',
+                role: 'tab',
+                className: 'mc-tab',
+                'data-active': tab === 'json' ? 'true' : undefined,
+                'aria-selected': tab === 'json' ? 'true' : 'false',
+                onClick: () => switchTab('json'),
+              },
+              t('tabJson'),
+            ),
+          ),
+          h(
+            'div',
+            { className: 'mc-dialog-body' },
+            tab === 'json'
+              ? h(
+                'div',
+                { className: 'mc-field' },
+                h('textarea', {
+                  className: 'mc-textarea',
+                  style: { minHeight: '260px' },
+                  'aria-label': t('tabJson'),
                   spellCheck: false,
-                  autoComplete: 'off',
-                  onChange: (event) => setAuthValue(event.target.value),
+                  value: jsonText,
+                  onChange: (event) => applyJson(event.target.value),
                 }),
-              boundRef
-                ? h(
-                  'button',
-                  {
-                    type: 'button',
-                    className: 'mc-btn mc-btn-sm',
-                    onClick: () => {
-                      patch({ headersText: removeHeaderValue(draft.headersText, authHeader) })
-                      setAuthNote('')
-                    },
-                  },
-                  t('authChange'),
-                )
-                : [
+                jsonError
+                  ? h('p', { className: 'mc-hint mc-err' }, jsonError)
+                  : h('p', { className: 'mc-hint' }, t('jsonHint')),
+              )
+              : h(
+                'div',
+                { className: 'mc-form' },
+                h(
+                  'div',
+                  { className: 'mc-field' },
+                  h('label', { className: 'mc-label' }, t('fieldName')),
+                  h('input', {
+                    ref: nameRef,
+                    className: 'mc-input',
+                    'aria-label': t('fieldName'),
+                    placeholder: t('namePlaceholder'),
+                    value: draft.serverName,
+                    disabled: mode === 'edit',
+                    spellCheck: false,
+                    autoComplete: 'off',
+                    onChange: (event) => patch({ serverName: event.target.value }),
+                  }),
+                  h('p', { className: 'mc-hint' }, t('fieldNameHint')),
+                ),
+                h(
+                  'div',
+                  { className: 'mc-field' },
+                  h('label', { className: 'mc-label' }, t('fieldTransport')),
                   h(
-                    'button',
-                    { key: 'reveal', type: 'button', className: 'mc-btn mc-btn-sm', onClick: () => setAuthVisible((value) => !value) },
-                    authVisible ? t('authHide') : t('authReveal'),
-                  ),
-                  h(
-                    'button',
+                    'select',
                     {
-                      key: 'apply',
-                      type: 'button',
-                      className: 'mc-btn mc-btn-sm mc-btn-primary',
-                      disabled: busy === 'auth',
-                      onClick: applyAuth,
+                      className: 'mc-select',
+                      'aria-label': t('fieldTransport'),
+                      value: draft.transport,
+                      onChange: (event) => patch({ transport: event.target.value }),
                     },
-                    busy === 'auth' ? t('saving') : mode === 'edit' ? t('authApply') : t('authBind'),
+                    transports.map((transport) => h(
+                      'option',
+                      { key: transport, value: transport },
+                      transport === 'stdio'
+                        ? t('transportStdio')
+                        : transport === 'sse' ? t('transportSse') : t('transportHttp'),
+                    )),
                   ),
-                ],
+                ),
+                h(
+                  'div',
+                  { className: 'mc-field' },
+                  h('label', { className: 'mc-label' }, t('fieldTimeout')),
+                  h('input', {
+                    className: 'mc-input',
+                    'aria-label': t('fieldTimeout'),
+                    placeholder: '60000',
+                    inputMode: 'numeric',
+                    value: draft.timeoutMs,
+                    onChange: (event) => patch({ timeoutMs: event.target.value.replace(/[^\d]/g, '') }),
+                  }),
+                  h('p', { className: 'mc-hint' }, t('fieldTimeoutHint')),
+                ),
+                draft.transport !== 'stdio'
+                  ? h(
+                    'div',
+                    { className: 'mc-field' },
+                    h('label', { className: 'mc-label' }, t('fieldUrl')),
+                    h('input', {
+                      className: 'mc-input',
+                      'aria-label': t('fieldUrl'),
+                      placeholder: t('urlPlaceholder'),
+                      value: draft.url,
+                      spellCheck: false,
+                      autoComplete: 'off',
+                      onChange: (event) => patch({ url: event.target.value }),
+                    }),
+                    h('p', { className: 'mc-hint' }, t('fieldUrlHint')),
+                  )
+                  : [
+                    h(
+                      'div',
+                      { key: 'command', className: 'mc-field' },
+                      h('label', { className: 'mc-label' }, t('fieldCommand')),
+                      h('input', {
+                        className: 'mc-input',
+                        'aria-label': t('fieldCommand'),
+                        value: draft.command,
+                        spellCheck: false,
+                        autoComplete: 'off',
+                        onChange: (event) => patch({ command: event.target.value }),
+                      }),
+                      h('p', { className: 'mc-hint' }, t('fieldCommandHint')),
+                    ),
+                    h(
+                      'div',
+                      { key: 'args', className: 'mc-field' },
+                      h('label', { className: 'mc-label' }, t('fieldArgs')),
+                      h('textarea', {
+                        className: 'mc-textarea',
+                        'aria-label': t('fieldArgs'),
+                        value: draft.argsText,
+                        spellCheck: false,
+                        onChange: (event) => patch({ argsText: event.target.value }),
+                      }),
+                      h('p', { className: 'mc-hint' }, t('fieldArgsHint')),
+                    ),
+                    h(
+                      'div',
+                      { key: 'env', className: 'mc-field' },
+                      h('label', { className: 'mc-label' }, t('fieldEnv')),
+                      h('textarea', {
+                        className: 'mc-textarea',
+                        'aria-label': t('fieldEnv'),
+                        value: draft.envText,
+                        spellCheck: false,
+                        onChange: (event) => patch({ envText: event.target.value }),
+                      }),
+                      h('p', { className: 'mc-hint' }, t('fieldEnvHint')),
+                    ),
+                    h(
+                      'div',
+                      { key: 'cwd', className: 'mc-field' },
+                      h('label', { className: 'mc-label' }, t('fieldCwd')),
+                      h('input', {
+                        className: 'mc-input',
+                        'aria-label': t('fieldCwd'),
+                        value: draft.cwd,
+                        spellCheck: false,
+                        onChange: (event) => patch({ cwd: event.target.value }),
+                      }),
+                    ),
+                  ],
+                draft.transport !== 'stdio'
+                  ? h(
+                    'div',
+                    { className: 'mc-field' },
+                    h(
+                      'div',
+                      { className: 'mc-field-head' },
+                      h('label', { className: 'mc-label' }, t('fieldHeaders')),
+                      h(
+                        'button',
+                        {
+                          type: 'button',
+                          className: 'mc-link-btn',
+                          onClick: () => commitRows([...rows, { name: '', value: '' }]),
+                        },
+                        t('headerAdd'),
+                      ),
+                    ),
+                    rows.length === 0
+                      ? h('p', { className: 'mc-hint' }, t('headerEmpty'))
+                      : rows.map((row, index) => h(
+                        'div',
+                        { className: 'mc-header-row', key: `${index}-${row.name}` },
+                        h('input', {
+                          className: 'mc-input',
+                          'aria-label': t('headerName'),
+                          placeholder: t('headerName'),
+                          value: row.name,
+                          spellCheck: false,
+                          autoComplete: 'off',
+                          onChange: (event) => {
+                            const next = [...rows]
+                            next[index] = { ...row, name: event.target.value }
+                            commitRows(next)
+                          },
+                        }),
+                        credentialRefOf(row.value)
+                          ? h('input', {
+                            className: 'mc-input mc-input-locked',
+                            'aria-label': t('headerValue'),
+                            value: `••••（${credentialRefOf(row.value)}）`,
+                            readOnly: true,
+                          })
+                          : h('input', {
+                            className: 'mc-input',
+                            'aria-label': t('headerValue'),
+                            placeholder: t('headerValue'),
+                            value: row.value,
+                            spellCheck: false,
+                            autoComplete: 'off',
+                            onChange: (event) => {
+                              const next = [...rows]
+                              next[index] = { ...row, value: event.target.value }
+                              commitRows(next)
+                            },
+                          }),
+                        credentialRefOf(row.value)
+                          ? h(
+                            'button',
+                            {
+                              type: 'button',
+                              className: 'mc-icon-btn',
+                              'aria-label': t('headerChange'),
+                              title: t('headerChange'),
+                              onClick: () => {
+                                const next = [...rows]
+                                next[index] = { ...row, value: '' }
+                                commitRows(next)
+                              },
+                            },
+                            '↻',
+                          )
+                          : h(
+                            'button',
+                            {
+                              type: 'button',
+                              className: 'mc-icon-btn',
+                              'aria-label': t('headerCredential'),
+                              title: t('headerCredential'),
+                              disabled: credBusy === String(index),
+                              onClick: () => bindCredential(index),
+                            },
+                            '🔑',
+                          ),
+                        h(
+                          'button',
+                          {
+                            type: 'button',
+                            className: 'mc-icon-btn',
+                            'aria-label': t('headerRemove'),
+                            title: t('headerRemove'),
+                            onClick: () => commitRows(rows.filter((_item, i) => i !== index)),
+                          },
+                          '🗑',
+                        ),
+                      )),
+                    h('p', { className: 'mc-hint' }, t('fieldHeadersHint')),
+                  )
+                  : null,
+                h(
+                  'label',
+                  { className: 'mc-check' },
+                  h('input', {
+                    type: 'checkbox',
+                    checked: draft.disabled,
+                    onChange: (event) => patch({ disabled: event.target.checked }),
+                  }),
+                  t('fieldDisabled'),
+                ),
+                errors.length > 0 ? h(Note, { kind: 'error' }, errors.join('；')) : null,
+                toast ? h(Note, { kind: 'ok' }, toast) : null,
+                probe ? h(ProbeReport, { report: probe, t }) : null,
+              ),
+          ),
+          h(
+            'footer',
+            { className: 'mc-dialog-foot' },
+            h(
+              'button',
+              { type: 'button', className: 'mc-btn mc-btn-primary', disabled: busy === 'save', onClick: save },
+              busy === 'save' ? t('saving') : mode === 'edit' ? t('actionSave') : t('actionAdd'),
             ),
             h(
-              'p',
-              { className: 'mc-hint' },
-              boundRef
-                ? (boundStatus?.configured
-                  ? t('credOk', { source: boundStatus.source })
-                  : t('credMissing'))
-                : boundValue === undefined
-                  ? t('authNeedValue')
-                  : t('authPlain'),
+              'button',
+              { type: 'button', className: 'mc-btn', disabled: busy === 'probe', onClick: runProbe },
+              busy === 'probe' ? t('testing') : t('testDraft'),
             ),
-            authNote ? h('p', { className: 'mc-hint' }, authNote) : null,
-          )
-          : null,
-        errors.length > 0
-          ? h(Note, { kind: 'error' }, errors.join('；'))
-          : null,
-        toast ? h(Note, { kind: 'ok' }, toast) : null,
-        probe ? h(ProbeReport, { report: probe, t }) : null,
-        h(
-          'div',
-          { className: 'mc-footer' },
-          h(
-            'button',
-            { type: 'button', className: 'mc-btn mc-btn-primary', disabled: busy === 'save', onClick: save },
-            busy === 'save' ? t('saving') : t('save'),
+            h('span', { className: 'mc-toolbar-spacer' }),
+            h('button', { type: 'button', className: 'mc-btn', onClick: onCancel }, t('cancel')),
           ),
-          h(
-            'button',
-            { type: 'button', className: 'mc-btn', disabled: busy === 'probe', onClick: runProbe },
-            busy === 'probe' ? t('testing') : t('testDraft'),
-          ),
-          h('button', { type: 'button', className: 'mc-btn', onClick: onCancel }, t('cancel')),
-          h('span', { className: 'mc-toast' }, t('probeSaveHint')),
         ),
       )
     }
@@ -1727,7 +1964,7 @@ window.__ModuleLoader__.load({
         !snapshot && !loadError ? h('p', { className: 'mc-hint' }, t('loading')) : null,
 
         editor
-          ? h(Editor, {
+          ? h(ServerDialog, {
             key: editor.mode === 'edit' ? `edit-${editor.server.id}` : 'add',
             mode: editor.mode,
             server: editor.server,
@@ -1736,6 +1973,7 @@ window.__ModuleLoader__.load({
             onCancel: () => setEditor(null),
             onSaved: afterSave,
             credentialRefs: editor.server ? (credentialStatus.get(editor.server.id) ?? []) : [],
+            dataDir: policy?.dataDir ?? '',
             onApplied: async (result) => {
               setToast(result?.receipt?.message ?? '')
               await refresh()
