@@ -213,8 +213,9 @@ try {
     assert.equal(state.state, 'ready', `state=${state.state} err=${JSON.stringify(state.lastError)}`)
     assert.equal(state.transport.type, 'streamable-http')
     assert.ok(registered.has('mcp__httpdemo__ping'))
-    assert.equal(state.config.headers.authorization, '••••')
-    assert.ok(!JSON.stringify(runtime.snapshot()).includes('sekret-token'))
+    // Header values reach the settings projection so the editor can reveal them;
+    // the page masks them by default. Diagnostics stay redacted (next test).
+    assert.equal(state.config.headers.authorization, 'Bearer sekret-token')
     await runtime.removeServer(result.receipt.id)
   })
 

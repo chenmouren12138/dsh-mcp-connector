@@ -113,9 +113,9 @@ window.__ModuleLoader__.load({
       headerName: 'Header 名称',
       headerValue: '值',
       headerRemove: '删除该请求头',
-      headerCredential: '存为凭据',
-      headerChange: '更换值',
-      headerEmpty: '还没有请求头。鉴权头用「+ 添加 Header」新增，值可用 🔑 存进凭据库。',
+
+      headerReveal: '显示值',
+      headerHide: '隐藏值',
       fieldName: '服务器名（工具命名空间）',
       fieldNameHint: '匹配 [A-Za-z0-9_-]{1,32}；作为工具前缀后不可修改，改名请删除后重建。',
       fieldTransport: '传输类型',
@@ -128,8 +128,8 @@ window.__ModuleLoader__.load({
       fieldCwd: '工作目录',
       fieldUrl: '服务地址',
       fieldUrlHint: 'Streamable HTTP 端点，例如 https://example.com/mcp。',
-      fieldHeaders: '其他请求头',
-      fieldHeadersHint: '每行 KEY: VALUE。鉴权头在上面单独管理；这里放租户、版本这类非敏感头。密钥也可写成 ${credential:名称}。',
+      fieldHeaders: '请求头',
+
       authTitle: '鉴权',
       authHint: '头名从令牌库选择，右侧填令牌。保存后只写入 DSH 凭据库，注册表里只留 ${credential:…} 引用。',
       authHeaderLabel: '请求头',
@@ -147,9 +147,7 @@ window.__ModuleLoader__.load({
       authPlain: '当前为明文值，建议改为凭据引用',
       advShow: '高级：其他请求头（{count}）',
       advHide: '收起其他请求头',
-      credOk: '已配置（{source}）',
-      credMissing: '未配置',
-      credUsed: '凭据引用',
+
       save: '保存',
       saving: '保存中…',
       testDraft: '测试连接',
@@ -283,9 +281,8 @@ window.__ModuleLoader__.load({
       headerName: 'Header',
       headerValue: 'Value',
       headerRemove: 'Remove this header',
-      headerCredential: 'Store as credential',
-      headerChange: 'Replace value',
-      headerEmpty: 'No headers yet. Add an auth header with “+ Add header”; the 🔑 button stores its value in credentials.',
+      headerReveal: 'Show value',
+      headerHide: 'Hide value',
       fieldName: 'Server name (tool namespace)',
       fieldNameHint: 'Matches [A-Za-z0-9_-]{1,32}; immutable once it prefixes tool names — rename by delete + create.',
       fieldTransport: 'Transport',
@@ -298,7 +295,7 @@ window.__ModuleLoader__.load({
       fieldCwd: 'Working directory',
       fieldUrl: 'Endpoint',
       fieldUrlHint: 'Streamable HTTP endpoint, e.g. https://example.com/mcp.',
-      fieldHeaders: 'Other headers',
+      fieldHeaders: 'Headers',
       fieldHeadersHint: 'One KEY: VALUE per line. The auth header is managed above; use this for tenant, version and other non-secret headers. Secrets may also be written as ${credential:NAME}.',
       authTitle: 'Authentication',
       authHint: 'Pick the header name from the token library and enter the token. Saving writes only to the DSH credential store; the registry keeps a ${credential:…} reference.',
@@ -317,9 +314,6 @@ window.__ModuleLoader__.load({
       authPlain: 'Stored as a literal value; prefer a credential reference',
       advShow: 'Advanced: other headers ({count})',
       advHide: 'Hide other headers',
-      credOk: 'Configured ({source})',
-      credMissing: 'Not configured',
-      credUsed: 'Credential references',
       save: 'Save',
       saving: 'Saving…',
       testDraft: 'Test connection',
@@ -793,6 +787,8 @@ window.__ModuleLoader__.load({
       check: 'M5 13l4 4L19 7',
       reload: 'M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5',
       warning: 'M12 4l9 16H3L12 4Zm0 6v5m0 3h.01',
+      eye: 'M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Zm10 2.6a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2Z',
+      eyeOff: 'M3 3l18 18M10.6 6.1A10.6 10.6 0 0 1 12 6c6.4 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7.4A17.4 17.4 0 0 0 2 12s3.6 6 10 6a10.4 10.4 0 0 0 4-.8',
     }
 
     function Icon({ name, size = 16, className, title }) {
@@ -995,7 +991,7 @@ window.__ModuleLoader__.load({
      * shown as its `${credential:REF}` reference, and a typed literal can be moved
      * into the DSH credential store with one click.
      */
-    function ServerDialog({ mode, server, allowedTransports, t, onCancel, onSaved, credentialRefs, onApplied, dataDir }) {
+    function ServerDialog({ mode, server, allowedTransports, t, onCancel, onSaved, onApplied, dataDir }) {
       const [draft, setDraft] = useState(() => (server ? draftOf(server) : { ...EMPTY_DRAFT }))
       const [tab, setTab] = useState('form')
       const [busy, setBusy] = useState('')
@@ -1004,7 +1000,7 @@ window.__ModuleLoader__.load({
       const [toast, setToast] = useState('')
       const [jsonText, setJsonText] = useState('')
       const [jsonError, setJsonError] = useState('')
-      const [credBusy, setCredBusy] = useState('')
+      const [revealed, setRevealed] = useState({})
       // Rows are local state: an empty row is a legitimate editing state that the
       // serialized `headersText` cannot represent, so deriving them from the text
       // would drop a freshly added blank row.
@@ -1109,34 +1105,6 @@ window.__ModuleLoader__.load({
           setBusy('')
         }
       }, [buildPayload, draft, mode, onSaved, server, t])
-
-      /** Store one row's literal value in the credential store, then keep the ref. */
-      const bindCredential = useCallback(async (index) => {
-        const row = rows[index]
-        if (!row || row.value.trim() === '') {
-          setErrors([t('authNeedValue')])
-          return
-        }
-        const name = (draft.serverName || server?.serverName || '').trim()
-        if (name === '') {
-          setErrors([t('authNeedName')])
-          return
-        }
-        const ref = credentialRefName(name, row.name || 'TOKEN')
-        setCredBusy(String(index))
-        setErrors([])
-        try {
-          await request('setCredential', { ref, value: row.value.trim() })
-          const next = [...rows]
-          next[index] = { ...row, value: `\${credential:${ref}}` }
-          commitRows(next)
-          setToast(t('authBound', { ref }))
-        } catch (error) {
-          setErrors([`${error.code ?? 'ACTION_FAILED'} · ${error.message}`])
-        } finally {
-          setCredBusy('')
-        }
-      }, [commitRows, draft.serverName, rows, server, t])
 
       const switchTab = useCallback((next) => {
         if (next === 'json') {
@@ -1388,85 +1356,60 @@ window.__ModuleLoader__.load({
                         t('headerAdd'),
                       ),
                     ),
-                    rows.length === 0
-                      ? h('p', { className: 'mc-hint' }, t('headerEmpty'))
-                      : rows.map((row, index) => h(
-                        'div',
-                        { className: 'mc-header-row', key: `${index}-${row.name}` },
-                        h('input', {
-                          className: 'mc-input',
-                          'aria-label': t('headerName'),
-                          placeholder: t('headerName'),
-                          value: row.name,
-                          spellCheck: false,
-                          autoComplete: 'off',
-                          onChange: (event) => {
-                            const next = [...rows]
-                            next[index] = { ...row, name: event.target.value }
-                            commitRows(next)
-                          },
-                        }),
-                        credentialRefOf(row.value)
-                          ? h('input', {
-                            className: 'mc-input mc-input-locked',
-                            'aria-label': t('headerValue'),
-                            value: `••••（${credentialRefOf(row.value)}）`,
-                            readOnly: true,
-                          })
-                          : h('input', {
-                            className: 'mc-input',
-                            'aria-label': t('headerValue'),
-                            placeholder: t('headerValue'),
-                            value: row.value,
-                            spellCheck: false,
-                            autoComplete: 'off',
-                            onChange: (event) => {
-                              const next = [...rows]
-                              next[index] = { ...row, value: event.target.value }
-                              commitRows(next)
-                            },
-                          }),
-                        credentialRefOf(row.value)
-                          ? h(
-                            'button',
-                            {
-                              type: 'button',
-                              className: 'mc-icon-btn',
-                              'aria-label': t('headerChange'),
-                              title: t('headerChange'),
-                              onClick: () => {
-                                const next = [...rows]
-                                next[index] = { ...row, value: '' }
-                                commitRows(next)
-                              },
-                            },
-                            h(Icon, { name: 'retry' }),
-                          )
-                          : h(
-                            'button',
-                            {
-                              type: 'button',
-                              className: 'mc-icon-btn',
-                              'aria-label': t('headerCredential'),
-                              title: t('headerCredential'),
-                              disabled: credBusy === String(index),
-                              onClick: () => bindCredential(index),
-                            },
-                            h(Icon, { name: 'key' }),
-                          ),
-                        h(
-                          'button',
-                          {
-                            type: 'button',
-                            className: 'mc-icon-btn',
-                            'aria-label': t('headerRemove'),
-                            title: t('headerRemove'),
-                            onClick: () => commitRows(rows.filter((_item, i) => i !== index)),
-                          },
-                          h(Icon, { name: 'trash' }),
-                        ),
-                      )),
-                    h('p', { className: 'mc-hint' }, t('fieldHeadersHint')),
+                    rows.map((row, index) => h(
+                      'div',
+                      { className: 'mc-header-row', key: `${index}-${row.name}` },
+                      h('input', {
+                        className: 'mc-input',
+                        'aria-label': t('headerName'),
+                        placeholder: t('headerName'),
+                        value: row.name,
+                        spellCheck: false,
+                        autoComplete: 'off',
+                        onChange: (event) => {
+                          const next = [...rows]
+                          next[index] = { ...row, name: event.target.value }
+                          commitRows(next)
+                        },
+                      }),
+                      h('input', {
+                        className: 'mc-input',
+                        'aria-label': t('headerValue'),
+                        placeholder: t('headerValue'),
+                        // Hidden by default; the eye reveals the full value.
+                        type: revealed[index] ? 'text' : 'password',
+                        value: row.value,
+                        spellCheck: false,
+                        autoComplete: 'off',
+                        onChange: (event) => {
+                          const next = [...rows]
+                          next[index] = { ...row, value: event.target.value }
+                          commitRows(next)
+                        },
+                      }),
+                      h(
+                        'button',
+                        {
+                          type: 'button',
+                          className: 'mc-icon-btn',
+                          'aria-label': revealed[index] ? t('headerHide') : t('headerReveal'),
+                          title: revealed[index] ? t('headerHide') : t('headerReveal'),
+                          onClick: () => setRevealed((current) => ({ ...current, [index]: !current[index] })),
+                        },
+                        h(Icon, { name: revealed[index] ? 'eyeOff' : 'eye' }),
+                      ),
+                      h(
+                        'button',
+                        {
+                          type: 'button',
+                          className: 'mc-icon-btn',
+                          'aria-label': t('headerRemove'),
+                          title: t('headerRemove'),
+                          onClick: () => commitRows(rows.filter((_item, i) => i !== index)),
+                        },
+                        h(Icon, { name: 'trash' }),
+                      ),
+                    )),
                   )
                   : null,
                 errors.length > 0 ? h(Note, { kind: 'error' }, errors.join('；')) : null,
@@ -1575,7 +1518,7 @@ window.__ModuleLoader__.load({
      * compete for attention. The row name itself is the details disclosure, so the
      * whole left side is one large target instead of a tiny chevron.
      */
-    function ServerItem({ server, t, locale, busy, onAction, credentialRefs }) {
+    function ServerItem({ server, t, locale, busy, onAction }) {
       const [open, setOpen] = useState(false)
       const [more, setMore] = useState(false)
       const [confirming, setConfirming] = useState(false)
@@ -1768,28 +1711,6 @@ window.__ModuleLoader__.load({
                 )
                 : null,
             ),
-            credentialRefs && credentialRefs.length > 0
-              ? h(
-                'div',
-                null,
-                h('p', { className: 'mc-hint' }, t('credUsed')),
-                h(
-                  'ul',
-                  { className: 'mc-list-plain' },
-                  credentialRefs.map((item) => h(
-                    'li',
-                    { key: item.ref },
-                    h('code', { className: 'mc-mono' }, `\${credential:${item.ref}}`),
-                    ' · ',
-                    h(
-                      'span',
-                      { className: item.configured ? 'mc-cred-ok' : 'mc-cred-miss' },
-                      item.configured ? t('credOk', { source: item.source }) : t('credMissing'),
-                    ),
-                  )),
-                ),
-              )
-              : null,
             h(
               'div',
               { className: 'mc-details-config' },
@@ -2108,7 +2029,6 @@ window.__ModuleLoader__.load({
       const stats = snapshot?.stats
       const servers = snapshot?.servers ?? []
       const policy = snapshot?.config
-      const credentialStatus = new Map((snapshot?.credentials ?? []).map((entry) => [entry.id, entry.refs]))
       const needle = query.trim().toLowerCase()
       const visible = needle === ''
         ? servers
@@ -2239,7 +2159,6 @@ window.__ModuleLoader__.load({
             t,
             onCancel: closeEditor,
             onSaved: afterSave,
-            credentialRefs: editor.server ? (credentialStatus.get(editor.server.id) ?? []) : [],
             dataDir: policy?.dataDir ?? '',
             onApplied: async (result) => {
               setToast(result?.receipt?.message ?? '')
@@ -2297,7 +2216,6 @@ window.__ModuleLoader__.load({
                 locale,
                 busy: busyId?.id === server.id ? busyId.action : '',
                 onAction: act,
-                credentialRefs: credentialStatus.get(server.id) ?? [],
               })),
             ),
       )

@@ -496,7 +496,7 @@ await check('草稿测试连接返回结构化失败', async () => {
   assert.match(text, /config/)
 })
 
-await check('请求头行：新增、存为凭据、删除', async () => {
+await check('请求头行：新增、默认隐藏、可显示、可删除', async () => {
   let dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
   byLabel(dialog, '传输类型').props.onChange({ target: { value: 'streamable-http' } })
   rerender()
@@ -504,39 +504,39 @@ await check('请求头行：新增、存为凭据、删除', async () => {
   byLabel(dialog, '服务地址').props.onChange({ target: { value: 'https://example.com/mcp' } })
   rerender()
   dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
-  assert.match(textOf(dialog), /还没有请求头/)
+  // No long hint and no credential affordance on the rows.
+  assert.ok(!textOf(dialog).includes('存为凭据'), 'credential action removed')
+  assert.ok(!textOf(dialog).includes('还没有请求头'), 'empty-state hint removed')
 
   byText(dialog, '+ 添加 Header').props.onClick()
   rerender()
   dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
   const nameInput = findAll(dialog, (node) => node.type === 'input' && node.props?.['aria-label'] === 'Header 名称')[0]
-  const valueInput = findAll(dialog, (node) => node.type === 'input' && node.props?.['aria-label'] === '值')[0]
   assert.ok(nameInput, 'header name input')
-  assert.ok(valueInput, 'header value input')
 
   nameInput.props.onChange({ target: { value: 'modao-token' } })
   rerender()
   dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
-  findAll(dialog, (node) => node.type === 'input' && node.props?.['aria-label'] === '值')[0]
-    .props.onChange({ target: { value: 'sekret-token' } })
+  let valueInput = findAll(dialog, (node) => node.type === 'input' && node.props?.['aria-label'] === '值')[0]
+  assert.equal(valueInput.props.type, 'password', 'value hidden by default')
+  valueInput.props.onChange({ target: { value: 'sekret-token' } })
   rerender()
 
   dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
-  byAria(dialog, '存为凭据').props.onClick()
-  await flush()
-  const call = calls.filter((item) => item.action === 'setCredential').at(-1)
-  assert.ok(call, 'setCredential called')
-  assert.equal(call.payload.ref, 'MCP_PROBE_MODAO_TOKEN')
-  assert.equal(call.payload.value, 'sekret-token')
-
+  byAria(dialog, '显示值').props.onClick()
+  rerender()
   dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
-  const locked = findAll(dialog, (node) => node.type === 'input' && node.props?.['aria-label'] === '值' && node.props.readOnly === true)[0]
-  assert.ok(locked, 'bound row shows a masked value')
-  assert.match(String(locked.props.value), /••••/)
+  valueInput = findAll(dialog, (node) => node.type === 'input' && node.props?.['aria-label'] === '值')[0]
+  assert.equal(valueInput.props.type, 'text', 'eye reveals the full value')
+  assert.equal(valueInput.props.value, 'sekret-token')
+
+  byAria(dialog, '隐藏值').props.onClick()
+  rerender()
+  dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  assert.equal(findAll(dialog, (node) => node.type === 'input' && node.props?.['aria-label'] === '值')[0].props.type, 'password')
 
   byAria(dialog, '删除该请求头').props.onClick()
   rerender()
-  assert.match(textOf(findAll(root, (node) => node.props?.className === 'mc-dialog')[0]), /还没有请求头/)
 })
 
 await check('JSON 标签：合法内容回写表单，非法给出提示', async () => {
