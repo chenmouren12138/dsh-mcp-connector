@@ -45,6 +45,8 @@ window.__ModuleLoader__.load({
       oauthAuthorized: '已授权',
       oauthFailed: '授权失败：{message}',
       testOkShort: '连接有效',
+      lastTestOk: '最近测试（{when}）：连接有效 · {summary}',
+      lastTestFail: '最近测试（{when}）未通过：{summary}',
       testFailedShort: '测试未通过',
       hintAuth: '需要鉴权：在「编辑」里加请求头（如 Figma 用 X-Figma-Token），或点「授权」走 OAuth（当前 401）。',
       oauthUnsupported: '该服务器不支持 OAuth 授权',
@@ -168,6 +170,8 @@ window.__ModuleLoader__.load({
       oauthAuthorized: 'Authorized',
       oauthFailed: 'Authorization failed: {message}',
       testOkShort: 'Connected',
+      lastTestOk: 'Last test ({when}): connected · {summary}',
+      lastTestFail: 'Last test ({when}) failed: {summary}',
       testFailedShort: 'Test failed',
       hintAuth: 'Authentication needed: add a header in 编辑 (Figma uses X-Figma-Token), or press 授权 for OAuth (401).',
       oauthUnsupported: 'This server does not support OAuth',
@@ -293,6 +297,9 @@ window.__ModuleLoader__.load({
       '.mc-btn:focus-visible,.mc-input:focus-visible,.mc-textarea:focus-visible,.mc-select:focus-visible',
       '{outline:var(--dsw-focus-ring-width) solid',
       'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:2px}',
+      '.mc-list-editor{list-style:none;margin:0;padding:0}',
+      '.mc-list-editor .mc-panel{margin-top:2px}',
+      '.mc-editor-standalone{margin:0 0 10px}',
       '.mc-list{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}',
       '.mc-item{display:flex;flex-direction:column;gap:8px;padding:12px 14px;',
       'border:.5px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-md);',
@@ -1949,7 +1956,7 @@ window.__ModuleLoader__.load({
      * compete for attention. The row name itself is the details disclosure, so the
      * whole left side is one large target instead of a tiny chevron.
      */
-    function ServerItem({ server, t, locale, busy, onAction, feedback }) {
+    function ServerItem({ server, t, locale, busy, onAction, feedback, testResult }) {
       const [open, setOpen] = useState(false)
       const [confirming, setConfirming] = useState(false)
       const [copied, setCopied] = useState('')
@@ -1996,7 +2003,10 @@ window.__ModuleLoader__.load({
             ? h('span', { className: 'mc-chip' }, t('toolsCount', { count: server.toolCount }))
             : null,
           server.config.transport !== 'stdio'
-            && (Object.keys(server.config.headers ?? {}).length === 0 || server.oauth?.status !== 'none')
+            && (
+              server.oauth?.status !== 'none'
+              || (Object.keys(server.config.headers ?? {}).length === 0 && server.lastError?.code === 'HTTP_AUTH')
+            )
             ? h(
               'button',
               {
@@ -2087,6 +2097,15 @@ window.__ModuleLoader__.load({
               : null,
         busy === 'test'
           ? h('p', { className: 'mc-hint' }, t('testing'))
+          : null,
+        testResult
+          ? h(
+            'p',
+            { className: testResult.ok ? 'mc-hint mc-oauth-ok' : 'mc-hint mc-err' },
+            testResult.ok
+              ? t('lastTestOk', { summary: testResult.message, when: formatTime(testResult.at, locale) })
+              : t('lastTestFail', { summary: testResult.message, when: formatTime(testResult.at, locale) }),
+          )
           : null,
         server.state === 'error' && server.lastError?.code === 'HTTP_AUTH' && !server.oauth?.authorized
           ? h('p', { className: 'mc-hint mc-err' }, t('hintAuth'))
@@ -2197,6 +2216,7 @@ window.__ModuleLoader__.load({
       const [refreshing, setRefreshing] = useState(false)
       const [refreshNote, setRefreshNote] = useState('')
       const [feedback, setFeedback] = useState({})
+      const [testResults, setTestResults] = useState({})
       const feedbackTimers = useRef(new Map())
       const searchRef = useRef(null)
       const listRef = useRef(null)
@@ -2338,6 +2358,17 @@ window.__ModuleLoader__.load({
           if (action === 'test') {
             const report = await request('testConnection', { id: server.id })
             setProbeReport({ for: server.serverName, report })
+            const failed = report?.ok === false || Boolean(report?.error)
+            setTestResults((current) => ({
+              ...current,
+              [server.id]: {
+                ok: !failed,
+                message: failed
+                  ? `${report?.error?.code ?? 'ACTION_FAILED'} · ${report?.error?.message ?? ''}`
+                  : t('toolsCount', { count: Array.isArray(report?.tools) ? report.tools.length : 0 }),
+                at: Date.now(),
+              },
+            }))
             if (report?.ok === false || report?.error) {
               const detail = report?.error ?? {}
               showFeedback(server.id, {
@@ -2424,9 +2455,16 @@ window.__ModuleLoader__.load({
       const servers = snapshot?.servers ?? []
       const policy = snapshot?.config
       const needle = query.trim().toLowerCase()
-      const visible = needle === ''
-        ? servers
+      const newestFirst = (a, b) => {
+        const left = Date.parse(a.createdAt ?? 0) || 0
+        const right = Date.parse(b.createdAt ?? 0) || 0
+        if (left !== right) return right - left
+        return String(a.serverName ?? '').localeCompare(String(b.serverName ?? ''))
+      }
+      const visible = (needle === ''
+        ? [...servers]
         : servers.filter((server) => String(server.serverName ?? '').toLowerCase().includes(needle))
+      ).sort(newestFirst)
 
       return h(
         'div',
@@ -2541,21 +2579,25 @@ window.__ModuleLoader__.load({
           )
           : null,
 
-        editor
-          ? h(ServerDialog, {
-            key: editor.mode === 'edit' ? `edit-${editor.server.id}` : 'add',
-            mode: editor.mode,
-            server: editor.server,
-            allowedTransports: policy?.allowedTransports ?? ['stdio', 'streamable-http'],
-            t,
-            onCancel: closeEditor,
-            onSaved: afterSave,
-            dataDir: policy?.dataDir ?? '',
-            onApplied: async (result) => {
-              setToast(result?.receipt?.message ?? '')
-              await refresh()
-            },
-          })
+        editor && editor.mode === 'add'
+          ? h(
+            'div',
+            { className: 'mc-editor-standalone' },
+            h(ServerDialog, {
+              key: 'add',
+              mode: 'add',
+              server: undefined,
+              allowedTransports: policy?.allowedTransports ?? ['stdio', 'streamable-http'],
+              t,
+              onCancel: closeEditor,
+              onSaved: afterSave,
+              dataDir: policy?.dataDir ?? '',
+              onApplied: async (result) => {
+                setToast(result?.receipt?.message ?? '')
+                await refresh()
+              },
+            }),
+          )
           : null,
 
         probeReport
@@ -2595,15 +2637,40 @@ window.__ModuleLoader__.load({
             : h(
               'ul',
               { className: 'mc-list', ref: listRef },
-              visible.map((server) => h(ServerItem, {
-                key: server.id,
-                server,
-                t,
-                locale,
-                busy: busyId?.id === server.id ? busyId.action : '',
-                onAction: act,
-                feedback: feedback[server.id],
-              })),
+              visible.flatMap((server) => {
+                const row = h(ServerItem, {
+                  key: `item-${server.id}`,
+                  server,
+                  t,
+                  locale,
+                  busy: busyId?.id === server.id ? busyId.action : '',
+                  onAction: act,
+                  feedback: feedback[server.id],
+                  testResult: testResults[server.id],
+                })
+                if (!(editor && editor.mode === 'edit' && editor.server?.id === server.id)) return [row]
+                return [
+                  row,
+                  h(
+                    'li',
+                    { key: `editor-${server.id}`, className: 'mc-list-editor' },
+                    h(ServerDialog, {
+                      key: `edit-${server.id}`,
+                      mode: 'edit',
+                      server: editor.server,
+                      allowedTransports: policy?.allowedTransports ?? ['stdio', 'streamable-http'],
+                      t,
+                      onCancel: closeEditor,
+                      onSaved: afterSave,
+                      dataDir: policy?.dataDir ?? '',
+                      onApplied: async (result) => {
+                        setToast(result?.receipt?.message ?? '')
+                        await refresh()
+                      },
+                    }),
+                  ),
+                ]
+              }),
             ),
       )
     }

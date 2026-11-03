@@ -226,7 +226,7 @@ const handlers = {
       serverName: payload.serverName,
       disabled: Boolean(payload.disabled),
       state: 'ready',
-      stateLabel: '就绪',
+      stateLabel: '灏辩华',
       config: { transport: payload.config.transport, command: payload.config.command, args: payload.config.args ?? [], cwd: null, env: {} },
       transport: { type: 'stdio' },
       protocolVersion: '2025-06-18',
@@ -410,7 +410,7 @@ await check('空注册表渲染标题、统计与空态', async () => {
   assert.ok(!text.includes('部署策略'), 'policy block removed')
 })
 
-await check('列表展示状态徽标、最近成功与错误摘要', async () => {
+await check('鍒楄〃灞曠ず鐘舵€佸窘鏍囥€佹渶杩戞垚鍔熶笌閿欒鎽樿', async () => {
   snapshot = {
     ...snapshot,
     servers: [
@@ -420,7 +420,7 @@ await check('列表展示状态徽标、最近成功与错误摘要', async () =
         notes: ['服务器未下发 Mcp-Session-Id（会话无状态运行）'],
         disabled: false,
         state: 'ready',
-        stateLabel: '就绪',
+        stateLabel: '灏辩华',
         config: { transport: 'stdio', command: 'node', args: ['server.js'], cwd: null, env: { TOKEN: '已设置' } },
         transport: { type: 'stdio', command: 'node' },
         protocolVersion: '2025-06-18',
@@ -438,7 +438,7 @@ await check('列表展示状态徽标、最近成功与错误摘要', async () =
         serverName: 'broken',
         disabled: false,
         state: 'error',
-        stateLabel: '错误',
+        stateLabel: '閿欒',
         config: { transport: 'streamable-http', url: 'https://example.com/mcp', headers: { authorization: '••••' } },
         transport: { type: 'streamable-http' },
         protocolVersion: null,
@@ -458,20 +458,18 @@ await check('列表展示状态徽标、最近成功与错误摘要', async () =
   await flush()
   const text = textOf(root)
   assert.match(text, /demo/)
-  assert.match(text, /就绪/)
+  assert.match(text, /灏辩华/)
   assert.match(text, /1 个工具/)
   assert.match(text, /HTTP_AUTH/)
   assert.equal(calls.filter((call) => call.action === 'state').length, 0)
   // Connection warnings stay out of the card; they are noise for the operator.
   assert.ok(!text.includes('Mcp-Session-Id'), 'session note hidden')
 
-  // Last-success lives in the details now, keeping the row to one meta line.
-  const disclosure = findAll(root, (node) => node.props?.className === 'mc-disclosure')[0]
-  assert.ok(disclosure, 'row disclosure')
-  disclosure.props.onClick()
+  const cardOf = () => findAll(findAll(root, (node) => node.props?.className === 'mc-list')[0], (node) => node.props?.className === 'mc-item' && textOf(node).includes('demo'))[0]
+  findAll(cardOf(), (node) => node.props?.className === 'mc-disclosure')[0].props.onClick()
   rerender()
-  assert.match(textOf(root), /最近成功/)
-  assert.match(textOf(root), /调用 3（失败 0）/)
+  assert.match(textOf(cardOf()), /最近成功/)
+  assert.match(textOf(cardOf()), /调用 3（失败 0）/)
 })
 
 await check('添加弹窗：标题、表单/JSON 标签与基础字段', async () => {
@@ -653,12 +651,12 @@ await check('列表行动作：禁用 / 重试 / 测试 / 删除二次确认', a
     assert.equal(tip.props.role, 'tooltip')
   }
   const probeCard = () => findAll(rowList(), (node) => node.props?.className === 'mc-item' && textOf(node).includes('probe'))[0]
-  const disable = byAria(card(), '禁用')
+  const disable = byAria(probeCard(), '禁用')
   disable.props.onClick()
   await flush()
   assert.ok(calls.some((item) => item.action === 'setDisabled' && item.payload.disabled === true))
   // The receipt lands on the card that produced it.
-  assert.match(textOf(card()), /已禁用：连接断开，配置保留/, 'card shows its own receipt')
+  assert.match(textOf(probeCard()), /已禁用：连接断开，配置保留/, 'card shows its own receipt')
 
   const test = byAria(probeCard(), '测试连接')
   test.props.onClick()
@@ -730,7 +728,8 @@ await check('编辑：名称有效时不再误报必填，测试连接直接发�
   root = mount()
   await flush()
   const list = findAll(root, (node) => node.props?.className === 'mc-list')[0]
-  byAria(list, '编辑').props.onClick()
+  const demoCard = findAll(list, (node) => node.props?.className === 'mc-item' && textOf(node).includes('demo'))[0]
+  byAria(demoCard, '编辑').props.onClick()
   await flush()
   const panel = () => findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
   const before = calls.length
@@ -801,7 +800,7 @@ await check('JSON 标签：一键优化格式化、保存基于 JSON 文本、�
   assert.equal(call.payload.config.command, 'node')
 })
 
-await check('一键优化：把不合法 JSON 修成合法 JSON', async () => {
+await check('涓€閿紭鍖栵細鎶婁笉鍚堟硶 JSON 淇垚鍚堟硶 JSON', async () => {
   root = mount()
   await flush()
   byText(root, '添加 MCP').props.onClick()
@@ -923,7 +922,7 @@ await check('OAuth：卡片上的授权 / 取消授权按钮调用对应动作',
   assert.ok(cardText.indexOf('2 个工具') >= 0, 'tools tag rendered')
   assert.ok(cardText.indexOf('2 个工具') < cardText.indexOf('授权'), 'authorize pill follows the tools tag')
 
-  assert.match(textOf(httpCard()), /需要鉴权/, 'auth failure explains the fix')
+  assert.match(textOf(httpCard()), /需要鉴权/, 'auth failure explains the fix | card=' + textOf(httpCard()))
 
   const authorize = byText(httpCard(), '授权')
   assert.ok(authorize, 'authorize tag button on http servers')
