@@ -481,7 +481,7 @@ await check('添加弹窗：标题、表单/JSON 标签与基础字段', async (
   assert.ok(byLabel(dialog, '服务器名（工具命名空间）'), 'name field')
   assert.ok(byAria(dialog, '传输类型'), 'transport picker')
   assert.ok(byLabel(dialog, '超时时间（毫秒，可选）'), 'timeout field')
-  assert.ok(byLabel(dialog, '命令'), 'stdio command field')
+  assert.ok(byLabel(dialog, '服务地址'), 'url field (HTTP is the default)')
   assert.ok(byText(dialog, '添加 MCP'), 'primary action')
   assert.ok(byText(dialog, '取消'), 'cancel action')
 })
@@ -609,6 +609,11 @@ await check('添加 MCP 调用 addServer 并展示挂载回执', async () => {
   byText(root, '添加 MCP').props.onClick()
   await flush()
   let dialog = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
+  byAria(dialog, '传输类型').props.onClick()
+  rerender()
+  byText(findAll(root, (node) => node.props?.['role'] === 'listbox')[0], 'stdio（本地子进程）').props.onClick()
+  rerender()
+  dialog = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
   byLabel(dialog, '服务器名（工具命名空间）').props.onChange({ target: { value: 'probe' } })
   byLabel(dialog, '命令').props.onChange({ target: { value: 'node' } })
   rerender()
@@ -702,6 +707,44 @@ await check('编辑弹窗与添加弹窗同构：标题、名称锁定、动作�
   assert.ok(text.indexOf('取消') < text.indexOf('保存 MCP'), 'primary action sits last')
   byText(dialog, '取消').props.onClick()
   await flush()
+})
+
+await check('编辑：名称有效时不再误报必填，测试连接直接发出', async () => {
+  root = mount()
+  await flush()
+  const list = findAll(root, (node) => node.props?.className === 'mc-list')[0]
+  byAria(list, '编辑').props.onClick()
+  await flush()
+  const panel = () => findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
+  const before = calls.length
+  byText(panel(), '测试连接').props.onClick()
+  await flush()
+  const fresh = calls.slice(before)
+  const probe = fresh.find((item) => item.action === 'testConnection')
+  assert.ok(probe, 'probe was sent')
+  assert.equal(probe.payload.serverName, 'demo')
+  assert.ok(!textOf(panel()).includes('必填'), 'valid name is not reported as required')
+})
+
+await check('必填校验：空名称点击保存给出红框与小字提示', async () => {
+  root = mount()
+  await flush()
+  const list = findAll(root, (node) => node.props?.className === 'mc-list')[0]
+  const httpCard = findAll(list, (node) => node.props?.className === 'mc-item' && textOf(node).includes('broken'))[0]
+  byAria(httpCard, '编辑').props.onClick()
+  await flush()
+  let panel = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
+  // Clear the URL to make a required field empty, then save.
+  const urlField = findAll(panel, (node) => node.type === 'input' && node.props?.['aria-label'] === '服务地址')[0]
+  urlField.props.onChange({ target: { value: '' } })
+  rerender()
+  panel = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
+  byText(panel, '保存 MCP').props.onClick()
+  await flush()
+  panel = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
+  const after = findAll(panel, (node) => node.type === 'input' && node.props?.['aria-label'] === '服务地址')[0]
+  assert.equal(after.props['aria-invalid'], 'true', 'invalid field is marked')
+  assert.match(textOf(panel), /必填/, 'small required hint shown')
 })
 
 const failed = results.filter((item) => !item.ok)

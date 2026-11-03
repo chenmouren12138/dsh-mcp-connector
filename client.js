@@ -158,9 +158,9 @@ window.__ModuleLoader__.load({
       saving: '保存中…',
       testDraft: '测试连接',
       testing: '测试中…',
-      requiredName: '请填写服务器名。',
-      requiredCommand: 'stdio 服务器需要命令。',
-      requiredUrl: 'HTTP 服务器需要端点地址。',
+      requiredName: '必填：服务器名（1–32 位，仅限字母、数字、- 和 _）。',
+      requiredCommand: '必填：启动命令（例如 npx / node）。',
+      requiredUrl: '必填：服务地址（HTTP(S) 端点）。',
       transportStdio: 'stdio（本地子进程）',
       transportHttp: 'Streamable HTTP',
       transportSse: 'HTTP + SSE（旧版）',
@@ -329,9 +329,9 @@ window.__ModuleLoader__.load({
       saving: 'Saving…',
       testDraft: 'Test connection',
       testing: 'Testing…',
-      requiredName: 'Enter a server name.',
-      requiredCommand: 'A stdio server needs a command.',
-      requiredUrl: 'An HTTP server needs an endpoint.',
+      requiredName: 'Required: 1–32 chars, letters, digits, - and _ only.',
+      requiredCommand: 'Required: the command to run (e.g. npx / node).',
+      requiredUrl: 'Required: the HTTP(S) endpoint.',
       transportStdio: 'stdio (local process)',
       transportHttp: 'Streamable HTTP',
       transportSse: 'HTTP + SSE (legacy)',
@@ -522,6 +522,12 @@ window.__ModuleLoader__.load({
       '.mc-select-option.is-active{background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-primary)}',
       '.mc-select-option.is-selected{color:var(--dsw-alias-label-primary)}',      '.mc-header-row{display:grid;grid-template-columns:1fr 1fr auto auto;gap:6px;align-items:center;margin-top:6px}',
       '.mc-input-locked{color:var(--dsw-alias-label-tertiary);background:var(--dsw-alias-bg-layer-1)}',
+      '.mc-input[aria-invalid="true"],.mc-textarea[aria-invalid="true"]{',
+      'border-color:var(--dsw-alias-state-error-primary,#e5484d)}',
+      '.mc-input[aria-invalid="true"]:focus-visible,.mc-textarea[aria-invalid="true"]:focus-visible{',
+      'outline-color:var(--dsw-alias-state-error-primary,#e5484d)}',
+      '.mc-hint.mc-err{font-size:11.5px;line-height:16px}',
+      '.mc-required{font-size:11.5px;line-height:16px;color:var(--dsw-alias-label-tertiary)}',
       '.mc-dialog-foot{display:flex;align-items:center;gap:8px;padding:12px 18px;',
       'border-top:.5px solid var(--dsw-alias-border-l2)}',
       // Icons, search, row disclosure, skeleton.
@@ -919,7 +925,7 @@ window.__ModuleLoader__.load({
 
     const EMPTY_DRAFT = {
       serverName: '',
-      transport: 'stdio',
+      transport: 'streamable-http',
       command: '',
       argsText: '',
       envText: '',
@@ -956,6 +962,24 @@ window.__ModuleLoader__.load({
         headersText: formatPairLines(config.headers, ':'),
         timeoutMs,
       }
+    }
+
+    /**
+     * Required-field validation for the editor, as a pure function of the draft.
+     * Actions re-read it from a ref, so a click can never validate a stale copy.
+     */
+    function validateFields(draft, t) {
+      const name = String(draft.serverName ?? '').trim()
+      return {
+        serverName: /^[A-Za-z0-9_-]{1,32}$/.test(name) ? '' : t('requiredName'),
+        command: draft.transport === 'stdio' && String(draft.command ?? '').trim() === '' ? t('requiredCommand') : '',
+        url: draft.transport !== 'stdio' && String(draft.url ?? '').trim() === '' ? t('requiredUrl') : '',
+        timeoutMs: draft.timeoutMs !== '' && draft.timeoutMs !== undefined && Number(draft.timeoutMs) < 1000 ? t('timeoutError') : '',
+      }
+    }
+
+    function firstProblem(fields) {
+      return Object.values(fields).find(Boolean) ?? ''
     }
 
     function draftToConfig(draft) {
@@ -1172,13 +1196,13 @@ window.__ModuleLoader__.load({
 
       // Field-level validation, rendered inline under each control. Save and probe
       // share it so the two paths can never disagree about what is valid.
-      const fieldErrors = {
-        serverName: /^[A-Za-z0-9_-]{1,32}$/.test(draft.serverName.trim()) ? '' : t('requiredName'),
-        command: draft.transport === 'stdio' && draft.command.trim() === '' ? t('requiredCommand') : '',
-        url: draft.transport !== 'stdio' && draft.url.trim() === '' ? t('requiredUrl') : '',
-        timeoutMs: draft.timeoutMs !== '' && Number(draft.timeoutMs) < 1000 ? t('timeoutError') : '',
-      }
-      const firstFieldError = Object.values(fieldErrors).find(Boolean) ?? ''
+      const fieldErrors = validateFields(draft, t)
+      const [attempted, setAttempted] = useState(false)
+      // Stay quiet until the first submit: an untouched form should never be red.
+      const shown = attempted ? fieldErrors : { serverName: '', command: '', url: '', timeoutMs: '' }
+      // The handlers read the live draft from this ref, never from a closure.
+      const draftRef = useRef(draft)
+      draftRef.current = draft
       const buildPayload = useCallback(() => ({
         serverName: draft.serverName.trim(),
         // Saving always means "connect": the form has no disabled switch, so a
@@ -1188,8 +1212,10 @@ window.__ModuleLoader__.load({
       }), [draft])
 
       const runProbe = useCallback(async () => {
-        if (firstFieldError !== '') {
-          setErrors([firstFieldError])
+        setAttempted(true)
+        const problems = Object.values(validateFields(draftRef.current, t)).filter(Boolean)
+        if (problems.length > 0) {
+          setErrors(problems)
           return
         }
         setErrors([])
@@ -1216,8 +1242,10 @@ window.__ModuleLoader__.load({
       }, [buildPayload, draft, t])
 
       const save = useCallback(async () => {
-        if (firstFieldError !== '') {
-          setErrors([firstFieldError])
+        setAttempted(true)
+        const problems = Object.values(validateFields(draftRef.current, t)).filter(Boolean)
+        if (problems.length > 0) {
+          setErrors(problems)
           return
         }
         setErrors([])
@@ -1349,6 +1377,7 @@ window.__ModuleLoader__.load({
                   h('input', {
                     ref: nameRef,
                     className: 'mc-input',
+                    'aria-invalid': shown.serverName ? 'true' : undefined,
                     'aria-label': t('fieldName'),
                     placeholder: t('namePlaceholder'),
                     value: draft.serverName,
@@ -1357,8 +1386,8 @@ window.__ModuleLoader__.load({
                     autoComplete: 'off',
                     onChange: (event) => patch({ serverName: event.target.value }),
                   }),
-                  fieldErrors.serverName
-                    ? h('p', { className: 'mc-hint mc-err' }, fieldErrors.serverName)
+                  shown.serverName
+                    ? h('p', { className: 'mc-hint mc-err' }, shown.serverName)
                     : h('p', { className: 'mc-hint' }, mode === 'edit' && server ? t('agentNameHint', { name: server.serverName }) : t('fieldNameHint')),
                 ),
                 h(
@@ -1383,13 +1412,14 @@ window.__ModuleLoader__.load({
                   h('label', { className: 'mc-label' }, t('fieldTimeout')),
                   h('input', {
                     className: 'mc-input',
+                    'aria-invalid': shown.timeoutMs ? 'true' : undefined,
                     'aria-label': t('fieldTimeout'),
                     placeholder: '60000',
                     inputMode: 'numeric',
                     value: draft.timeoutMs,
                     onChange: (event) => patch({ timeoutMs: event.target.value.replace(/[^\d]/g, '') }),
                   }),
-                  fieldErrors.timeoutMs ? h('p', { className: 'mc-hint mc-err' }, fieldErrors.timeoutMs) : h('p', { className: 'mc-hint' }, t('fieldTimeoutHint')),
+                  shown.timeoutMs ? h('p', { className: 'mc-hint mc-err' }, shown.timeoutMs) : h('p', { className: 'mc-hint' }, t('fieldTimeoutHint')),
                 ),
                 draft.transport !== 'stdio'
                   ? h(
@@ -1398,6 +1428,7 @@ window.__ModuleLoader__.load({
                     h('label', { className: 'mc-label' }, t('fieldUrl')),
                     h('input', {
                       className: 'mc-input',
+                      'aria-invalid': shown.url ? 'true' : undefined,
                       'aria-label': t('fieldUrl'),
                       placeholder: t('urlPlaceholder'),
                       value: draft.url,
@@ -1405,7 +1436,7 @@ window.__ModuleLoader__.load({
                       autoComplete: 'off',
                       onChange: (event) => patch({ url: event.target.value }),
                     }),
-                    fieldErrors.url ? h('p', { className: 'mc-hint mc-err' }, fieldErrors.url) : h('p', { className: 'mc-hint' }, t('fieldUrlHint')),
+                    shown.url ? h('p', { className: 'mc-hint mc-err' }, shown.url) : h('p', { className: 'mc-hint' }, t('fieldUrlHint')),
                   )
                   : [
                     h(
@@ -1414,13 +1445,14 @@ window.__ModuleLoader__.load({
                       h('label', { className: 'mc-label' }, t('fieldCommand')),
                       h('input', {
                         className: 'mc-input',
+                        'aria-invalid': shown.command ? 'true' : undefined,
                         'aria-label': t('fieldCommand'),
                         value: draft.command,
                         spellCheck: false,
                         autoComplete: 'off',
                         onChange: (event) => patch({ command: event.target.value }),
                       }),
-                      fieldErrors.command ? h('p', { className: 'mc-hint mc-err' }, fieldErrors.command) : h('p', { className: 'mc-hint' }, t('fieldCommandHint')),
+                      shown.command ? h('p', { className: 'mc-hint mc-err' }, shown.command) : h('p', { className: 'mc-hint' }, t('fieldCommandHint')),
                     ),
                     h(
                       'div',
