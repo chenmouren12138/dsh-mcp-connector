@@ -99,6 +99,7 @@ window.__ModuleLoader__.load({
       headerMaskedValue: '请求头「{name}」的值是掩码占位符（••••），请重新输入真实值。',
       jsonOptimize: '一键优化',
       jsonRepaired: '已修复 {count} 处并整理为标准格式',
+      jsonMultiple: '文档里有 {count} 台服务器；这里只编辑第一台，其余请在批量导入里处理',
       jsonOptimized: '已整理为标准格式',
       jsonOptimizeHint: '整理为标准 JSON；单引号、注释、尾逗号、未加引号的键会自动修复',
       namePlaceholder: '例如 github-search',
@@ -218,6 +219,7 @@ window.__ModuleLoader__.load({
       headerMaskedValue: 'Header “{name}” still holds the mask placeholder (••••); enter the real value.',
       jsonOptimize: 'Tidy up',
       jsonRepaired: 'Repaired {count} issue(s) and formatted',
+      jsonMultiple: 'The document holds {count} servers; this editor edits the first one',
       jsonOptimized: 'Formatted',
       jsonOptimizeHint: 'Normalise to strict JSON; fixes quotes, comments, trailing commas and bare keys',
       namePlaceholder: 'e.g. github-search',
@@ -1088,21 +1090,72 @@ window.__ModuleLoader__.load({
         .join('\n')
     }
 
-    /** The one-entry JSON document the JSON tab shows (Claude Desktop dialect). */
-    function draftToEntry(draft) {
-      const name = (draft.serverName || 'mcp').trim()
-      return { [name]: draftToConfig(draft) }
+    /** Wrapper keys the ecosystem uses around a `name → config` map. */
+    const DIALECT_KEYS = ['mcpServers', 'servers', 'mcp']
+
+    const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+
+    /**
+     * Recognise the documents people actually paste. Every dialect ends up as a
+     * `name → config` map plus the wrapper key, so the JSON tab can round-trip the
+     * shape it was given instead of rewriting it.
+     */
+    function parseEntryDocument(input) {
+      if (!isPlainObject(input)) throw new Error('JSON 需要是一个对象')
+      const keys = Object.keys(input)
+      if (keys.length === 1 && DIALECT_KEYS.includes(keys[0]) && isPlainObject(input[keys[0]])) {
+        return { dialect: keys[0], map: input[keys[0]], wrapper: keys[0] }
+      }
+      // A config object uses these keys and has no name layer.
+      if (keys.some((key) => ['transport', 'command', 'url', 'type', 'headers', 'args', 'env', 'cwd'].includes(key))) {
+        return { dialect: 'bare', map: input }
+      }
+      return { dialect: 'nameMap', map: input }
     }
 
-    /** Parse either `{ name: config }` or a bare config back into a draft. */
-    function entryToDraft(input) {
-      if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('JSON 需要是一个对象')
-      const keys = Object.keys(input)
-      const first = keys[0]
-      if (first !== undefined && input[first] && typeof input[first] === 'object' && !Array.isArray(input[first])) {
-        return draftOf({ serverName: first, config: input[first], disabled: false })
+    const CONFIG_KEYS = ['transport', 'command', 'url', 'type', 'headers', 'args', 'env', 'cwd']
+    const isConfigLike = (value) => isPlainObject(value) && Object.keys(value).some((key) => CONFIG_KEYS.includes(key))
+
+    /** Read a document into `{ draft, dialect, count }`; `count` counts named servers. */
+    function readEntryDocument(input, preferredName) {
+      const { dialect, map, wrapper } = parseEntryDocument(input)
+      if (dialect === 'bare') {
+        return {
+          dialect: 'nameMap',
+          count: 1,
+          draft: draftOf({ serverName: preferredName || '', config: map, disabled: false }),
+        }
       }
-      return draftOf({ serverName: '', config: input, disabled: false })
+      // `{ "mcpServers": { command: … } }` — the wrapper holds one bare config, so
+      // keep the content instead of hunting for a nested name.
+      if (isConfigLike(map)) {
+        return {
+          dialect,
+          count: 1,
+          draft: draftOf({ serverName: preferredName || wrapper || '', config: map, disabled: false }),
+        }
+      }
+      const names = Object.keys(map).filter((key) => isPlainObject(map[key]))
+      const chosen = preferredName && names.includes(preferredName) ? preferredName : names[0]
+      const config = chosen === undefined ? map[''] ?? {} : map[chosen]
+      return {
+        dialect,
+        count: names.length,
+        draft: draftOf({ serverName: chosen ?? '', config: config ?? {}, disabled: false }),
+      }
+    }
+
+    /** Render a draft back in the shape the document used. */
+    function draftToEntry(draft, dialect = 'nameMap') {
+      const name = (draft.serverName || 'mcp').trim()
+      const config = draftToConfig(draft)
+      if (DIALECT_KEYS.includes(dialect)) return { [dialect]: { [name]: config } }
+      return { [name]: config }
+    }
+
+    /** Backwards-compatible helper: just the draft. */
+    function entryToDraft(input, preferredName) {
+      return readEntryDocument(input, preferredName).draft
     }
 
     function validateDraft(draft, t) {
@@ -1222,6 +1275,7 @@ window.__ModuleLoader__.load({
       const [jsonText, setJsonText] = useState('')
       const [jsonError, setJsonError] = useState('')
       const [jsonNotice, setJsonNotice] = useState('')
+      const [jsonDialect, setJsonDialect] = useState('nameMap')
       const [revealed, setRevealed] = useState({})
       // Rows are local state: an empty row is a legitimate editing state that the
       // serialized `headersText` cannot represent, so deriving them from the text
@@ -1241,7 +1295,7 @@ window.__ModuleLoader__.load({
         setErrors([])
         setToast('')
         setJsonError('')
-        setJsonText(JSON.stringify(draftToEntry(next), null, 2))
+        setJsonText(JSON.stringify(draftToEntry(next, 'nameMap'), null, 2))
         setRowList(headerRows(next.headersText))
       }, [server, mode])
 
@@ -1289,7 +1343,7 @@ window.__ModuleLoader__.load({
        */
       const draftFromJson = useCallback(() => {
         try {
-          return entryToDraft(JSON.parse(jsonText))
+          return readEntryDocument(JSON.parse(jsonText), draftRef.current?.serverName).draft
         } catch (error) {
           setJsonError(t('jsonInvalid', { message: error.message }))
           return undefined
@@ -1303,15 +1357,20 @@ window.__ModuleLoader__.load({
        */
       const formatJson = useCallback(() => {
         let parsed
+        let dialect = jsonDialect
         let repaired = 0
         try {
-          parsed = entryToDraft(JSON.parse(jsonText))
+          const doc = readEntryDocument(JSON.parse(jsonText), draftRef.current?.serverName)
+          parsed = doc.draft
+          dialect = doc.dialect
         } catch (strictError) {
           let repairedText = ''
           try {
             const repair = repairJson(jsonText)
             repairedText = repair.text
-            parsed = entryToDraft(JSON.parse(repairedText))
+            const doc = readEntryDocument(JSON.parse(repairedText), draftRef.current?.serverName)
+            parsed = doc.draft
+            dialect = doc.dialect
             repaired = repairCount(repair.notes)
           } catch {
             setJsonError(t('jsonInvalid', { message: strictError.message }))
@@ -1321,7 +1380,8 @@ window.__ModuleLoader__.load({
         }
         setDraft({ ...parsed })
         setRowList(headerRows(parsed.headersText))
-        setJsonText(JSON.stringify(draftToEntry(parsed), null, 2))
+        setJsonDialect(dialect)
+        setJsonText(JSON.stringify(draftToEntry(parsed, dialect), null, 2))
         setJsonError('')
         setJsonNotice(repaired > 0 ? t('jsonRepaired', { count: repaired }) : t('jsonOptimized'))
         setTimeout(() => setJsonNotice(''), 3200).unref?.()
@@ -1400,9 +1460,9 @@ window.__ModuleLoader__.load({
         }
         try {
           const parsed = JSON.parse(jsonText)
-          const nextDraft = entryToDraft(parsed)
-          setDraft({ ...nextDraft })
-          setRowList(headerRows(nextDraft.headersText))
+          const doc = readEntryDocument(parsed, draftRef.current?.serverName)
+          setDraft({ ...doc.draft })
+          setRowList(headerRows(doc.draft.headersText))
           setJsonError('')
           setTab('form')
         } catch (error) {
@@ -1414,10 +1474,11 @@ window.__ModuleLoader__.load({
         setJsonText(text)
         try {
           const parsed = JSON.parse(text)
-          const nextDraft = entryToDraft(parsed)
-          setDraft({ ...nextDraft })
-          setRowList(headerRows(nextDraft.headersText))
-          setJsonError('')
+          const doc = readEntryDocument(parsed, draftRef.current?.serverName)
+          setJsonDialect(doc.dialect)
+          setDraft({ ...doc.draft })
+          setRowList(headerRows(doc.draft.headersText))
+          setJsonError(doc.count > 1 ? t('jsonMultiple', { count: doc.count }) : '')
         } catch (error) {
           setJsonError(t('jsonInvalid', { message: error.message }))
         }

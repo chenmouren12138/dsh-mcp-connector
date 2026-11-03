@@ -831,6 +831,55 @@ await check('一键优化：把不合法 JSON 修成合法 JSON', async () => {
   assert.equal(call.payload.config.command, 'node')
 })
 
+await check('JSON 方言：mcpServers 包一层也能识别并原样输出', async () => {
+  root = mount()
+  await flush()
+  byText(root, '添加 MCP').props.onClick()
+  await flush()
+  const panelOf = () => findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
+  const areaOf = () => findAll(panelOf(), (node) => node.type === 'textarea' && node.props?.['aria-label'] === 'JSON')[0]
+
+  byText(panelOf(), 'JSON').props.onClick()
+  await flush()
+  // The shape Figma documents, with a trailing comma (invalid JSON on purpose).
+  const figma = '{"mcpServers":{"figma":{"type":"streamable-http","url":"https://mcp.figma.com/mcp",}}}'
+  areaOf().props.onChange({ target: { value: figma } })
+  rerender()
+
+  byText(panelOf(), '一键优化').props.onClick()
+  rerender()
+  const fixed = JSON.parse(areaOf().props.value)
+  assert.ok(fixed.mcpServers, 'wrapper preserved')
+  assert.equal(fixed.mcpServers.figma.url, 'https://mcp.figma.com/mcp', 'url kept')
+  assert.ok(!('transport' in fixed.mcpServers.figma) || fixed.mcpServers.figma.transport !== 'stdio', 'not downgraded to stdio')
+  assert.match(textOf(panelOf()), /已修复 \d+ 处/)
+
+  // The form tab sees the same entry.
+  byText(panelOf(), '表单').props.onClick()
+  rerender()
+  const urlField = findAll(panelOf(), (node) => node.type === 'input' && node.props?.['aria-label'] === '服务地址')[0]
+  assert.equal(urlField.props.value, 'https://mcp.figma.com/mcp', 'form picked the url up')
+})
+
+await check('JSON 容错：wrapper 里放裸配置不被清空', async () => {
+  root = mount()
+  await flush()
+  byText(root, '添加 MCP').props.onClick()
+  await flush()
+  const panelOf = () => findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
+  const areaOf = () => findAll(panelOf(), (node) => node.type === 'textarea' && node.props?.['aria-label'] === 'JSON')[0]
+  byText(panelOf(), 'JSON').props.onClick()
+  await flush()
+  areaOf().props.onChange({ target: { value: '{"mcpServers":{"transport":"stdio","command":"node","args":[],"env":{},"cwd":""}}' } })
+  rerender()
+  byText(panelOf(), '一键优化').props.onClick()
+  rerender()
+  const fixed = JSON.parse(areaOf().props.value)
+  const entry = fixed.mcpServers?.mcpServers ?? fixed.mcpServers
+  assert.ok(entry, 'content kept')
+  assert.equal(entry.command, 'node', 'command survived')
+})
+
 await check('OAuth：卡片上的授权 / 取消授权按钮调用对应动作', async () => {
   snapshot = {
     ...snapshot,
