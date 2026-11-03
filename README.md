@@ -120,6 +120,33 @@ DSH 插件：在 Cordis 运行时内实现一个 **MCP Client 能力 Seam**，�
 - **状态是运行期产物**，不写盘：`lastSuccessAt`、`lastError`、重连计数、调用计数都在内存里，重载即重新探测。
 - 默认不做心跳；`probeIntervalMs > 0` 可开启周期探测。断线按指数退避重连（`reconnect`），次数用尽后停在 `error` 并要求手动重试。
 
+## 凭据与密钥
+
+令牌不进注册表。任何 `headers` 或 `env` 的值都可以写成引用：
+
+```json
+{
+  "type": "streamable-http",
+  "url": "https://example.com/mcp",
+  "headers": { "x-api-key": "${credential:EXAMPLE_TOKEN}" }
+}
+```
+
+- 落盘、导出、界面展示、诊断都是以 `${credential:EXAMPLE_TOKEN}` 这个占位符出现，**不是明文**；
+- 每次连接/探测时才解析：先问 DSH 凭据服务（`ctx.credentials.resolve`），再退回同名环境变量；
+- 轮换令牌只改凭据，连接下一次重连或「测试连接」即生效，**不改配置文件、不重启**；
+- 引用解析不到时返回结构化诊断 `CREDENTIAL_MISSING`（`phase: config`），列出缺哪些引用，而不是一个莫名的 401；
+- 部署没有凭据服务时 `CREDENTIAL_UNAVAILABLE`，提示改用同名环境变量。
+
+存凭据两条路：
+
+| 方式 | 操作 |
+|---|---|
+| 设置页 | 编辑服务器 → 「凭据」小节 → 填名称和值 → **存入凭据库**（值只进凭据服务） |
+| 环境变量 | 直接设置同名变量后重启宿主（宿主启动时继承环境） |
+
+快照里每个服务器会带 `credentialRefs`，接口 `GET /dsh-mcp-connector/api` 的 `credentials` 字段给出每个引用的 `configured` 与 `source`（`credentials` / `environment` / `missing`），详情页据此显示「已配置 / 未配置」。
+
 ## 导入导出
 
 导入接受四种结构（含 VS Code 的 `{"servers": {…}}`），字段方言做归一化：
@@ -170,9 +197,9 @@ DSH 插件：在 Cordis 运行时内实现一个 **MCP Client 能力 Seam**，�
 ## 测试
 
 ```bash
-node tests/host.test.mjs     # 31 项：协议、传输、错误域、CRUD、导入导出、持久化、清理
-node tests/api.test.mjs      # 11 项：设置页所用的同源管理 API（快照、动作、守卫、导入失败信封）
-node tests/client.test.mjs   # 8 项：迷你 React 运行时里驱动设置页，验证每次交互打到正确端点
+node tests/host.test.mjs     # 37 项：协议、传输、错误域、CRUD、导入导出、凭据引用、持久化、清理
+node tests/api.test.mjs      # 12 项：设置页所用的同源管理 API（快照、动作、守卫、凭据、导入失败信封）
+node tests/client.test.mjs   # 9 项：迷你 React 运行时里驱动设置页，验证每次交互打到正确端点
 ```
 
 `host.test.mjs` 真实启动一个 stdio MCP 服务器（`tests/echo-server.mjs`）与若干 HTTP 端点，覆盖成功路径与 `COMMAND_NOT_FOUND` / `CWD_MISSING` / `NETWORK_TCP` / `HTTP_AUTH` / `HTTP_NOT_FOUND` / `HTTP_SERVER_ERROR` / 工具业务错误等失败路径，并断言快照里不会出现任何凭据字面量。`api.test.mjs` 把真实的 `registerApi` 挂到假 webServer 上，按页面的调用方式走一遍 `GET /api`、各动作、`404/405/400` 守卫与导入拒绝信封。

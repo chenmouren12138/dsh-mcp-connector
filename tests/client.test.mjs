@@ -275,6 +275,9 @@ const handlers = {
   exportJson(payload) {
     return { format: payload.format, count: snapshot.servers.length, document: payload.format === 'array' ? [{ serverName: 'demo' }] : { mcpServers: { demo: { command: 'node' } } } }
   },
+  setCredential(payload) {
+    return { ref: payload.ref, stored: true }
+  },
 }
 
 async function fetchMock(url, init = {}) {
@@ -473,6 +476,27 @@ await check('草稿测试连接返回结构化失败', async () => {
   assert.match(text, /连接失败/)
   assert.match(text, /COMMAND_NOT_FOUND/)
   assert.match(text, /config/)
+})
+
+await check('编辑器可把令牌存入凭据库', async () => {
+  const refInput = byPlaceholder(root, '凭据名称')
+  const valueInput = byPlaceholder(root, '凭据值')
+  assert.ok(refInput, 'credential name input')
+  assert.ok(valueInput, 'credential value input')
+  refInput.props.onChange({ target: { value: 'MODAO_TOKEN' } })
+  valueInput.props.onChange({ target: { value: 'sekret-value' } })
+  rerender()
+  const store = byText(root, '存入凭据库')
+  assert.ok(store, 'store button')
+  store.props.onClick()
+  await flush()
+  const call = calls.find((item) => item.action === 'setCredential')
+  assert.ok(call, 'setCredential called')
+  assert.equal(call.payload.ref, 'MODAO_TOKEN')
+  assert.equal(call.payload.value, 'sekret-value')
+  assert.match(textOf(root), /已存入凭据库/)
+  // The secret never lands in the connection config the editor would submit.
+  assert.ok(!JSON.stringify(snapshot).includes('sekret-value'))
 })
 
 await check('保存调用 addServer 并展示挂载回执', async () => {

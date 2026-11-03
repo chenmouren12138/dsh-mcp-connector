@@ -95,8 +95,18 @@ window.__ModuleLoader__.load({
       fieldUrl: '端点地址',
       fieldUrlHint: 'Streamable HTTP 端点，例如 https://example.com/mcp。',
       fieldHeaders: '请求头',
-      fieldHeadersHint: '每行 KEY: VALUE，用于鉴权。',
+      fieldHeadersHint: '每行 KEY: VALUE。密钥可写成 ${credential:名称}，值只存进 DSH 凭据库，不写进注册表。',
       fieldDisabled: '保存后禁用',
+      credTitle: '凭据（可选）',
+      credHint: '把令牌存进 DSH 凭据库，然后在上面的请求头写 ${credential:名称}。轮换令牌时只需改这里，配置文件不动。',
+      credRef: '凭据名称',
+      credValue: '凭据值',
+      credSave: '存入凭据库',
+      credSaved: '已存入凭据库；请求头里用 ${credential:名称} 引用即可',
+      credNeedBoth: '请同时填写凭据名称和值。',
+      credOk: '已配置（{source}）',
+      credMissing: '未配置',
+      credUsed: '凭据引用',
       save: '保存',
       saving: '保存中…',
       testDraft: '测试连接',
@@ -212,8 +222,18 @@ window.__ModuleLoader__.load({
       fieldUrl: 'Endpoint',
       fieldUrlHint: 'Streamable HTTP endpoint, e.g. https://example.com/mcp.',
       fieldHeaders: 'Headers',
-      fieldHeadersHint: 'One KEY: VALUE per line, for authentication.',
+      fieldHeadersHint: 'One KEY: VALUE per line. Secrets may be written as ${credential:NAME}: the value lives in the DSH credential store, not in the registry.',
       fieldDisabled: 'Save as disabled',
+      credTitle: 'Credential (optional)',
+      credHint: 'Store a token in the DSH credential store, then reference it from a header as ${credential:NAME}. Rotating it edits no configuration.',
+      credRef: 'Credential name',
+      credValue: 'Credential value',
+      credSave: 'Store in credentials',
+      credSaved: 'Stored; reference it from a header as ${credential:NAME}',
+      credNeedBoth: 'Enter both a credential name and a value.',
+      credOk: 'Configured ({source})',
+      credMissing: 'Not configured',
+      credUsed: 'Credential references',
       save: 'Save',
       saving: 'Saving…',
       testDraft: 'Test connection',
@@ -351,6 +371,13 @@ window.__ModuleLoader__.load({
       'color:var(--dsw-alias-label-secondary)}',
       '.mc-footer{display:flex;align-items:center;gap:10px;flex-wrap:wrap}',
       '.mc-toast{flex:1;min-width:0;font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}',
+      '.mc-cred{display:flex;flex-direction:column;gap:6px;padding:10px 12px;',
+      'border:.5px dashed var(--dsw-alias-border-l3);border-radius:var(--dsw-radius-sm)}',
+      '.mc-cred-title{margin:0;font-size:12.5px;font-weight:500;line-height:18px;',
+      'color:var(--dsw-alias-label-secondary)}',
+      '.mc-cred-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}',
+      '.mc-cred-ok{color:var(--dsw-alias-state-business-primary)}',
+      '.mc-cred-miss{color:var(--dsw-alias-label-tertiary)}',
       '@media (max-width:560px){.mc-grid{grid-template-columns:1fr}}',
       '@media (prefers-reduced-motion:reduce){.mc-dot{animation:none}}',
     ].join('')
@@ -640,6 +667,9 @@ window.__ModuleLoader__.load({
       const [errors, setErrors] = useState([])
       const [probe, setProbe] = useState(null)
       const [toast, setToast] = useState('')
+      const [credRef, setCredRef] = useState('')
+      const [credValue, setCredValue] = useState('')
+      const [credNote, setCredNote] = useState('')
       const nameRef = useRef(null)
 
       useEffect(() => {
@@ -647,11 +677,32 @@ window.__ModuleLoader__.load({
         setProbe(null)
         setErrors([])
         setToast('')
+        setCredValue('')
+        setCredNote('')
       }, [server, mode])
 
       useEffect(() => {
         if (mode === 'add') nameRef.current?.focus()
       }, [mode])
+
+      /** Store the secret in the DSH credential store; the registry keeps only a ref. */
+      const storeCredential = useCallback(async () => {
+        if (credRef.trim() === '' || credValue === '') {
+          setCredNote(t('credNeedBoth'))
+          return
+        }
+        setBusy('cred')
+        setCredNote('')
+        try {
+          await request('setCredential', { ref: credRef.trim(), value: credValue })
+          setCredValue('')
+          setCredNote(t('credSaved'))
+        } catch (error) {
+          setCredNote(`${error.code ?? 'ACTION_FAILED'} · ${error.message}`)
+        } finally {
+          setBusy('')
+        }
+      }, [credRef, credValue, t])
 
       const transports = allowedTransports.length > 0 ? allowedTransports : ['stdio', 'streamable-http']
       const patch = useCallback((next) => setDraft((current) => ({ ...current, ...next })), [])
@@ -833,6 +884,40 @@ window.__ModuleLoader__.load({
           }),
           t('fieldDisabled'),
         ),
+        h(
+          'div',
+          { className: 'mc-cred' },
+          h('h4', { className: 'mc-cred-title' }, t('credTitle')),
+          h('p', { className: 'mc-hint' }, t('credHint')),
+          h(
+            'div',
+            { className: 'mc-row-inline' },
+            h('input', {
+              className: 'mc-input',
+              style: { maxWidth: '220px' },
+              placeholder: t('credRef'),
+              value: credRef,
+              spellCheck: false,
+              autoComplete: 'off',
+              onChange: (event) => setCredRef(event.target.value),
+            }),
+            h('input', {
+              className: 'mc-input',
+              style: { maxWidth: '260px' },
+              type: 'password',
+              placeholder: t('credValue'),
+              value: credValue,
+              autoComplete: 'off',
+              onChange: (event) => setCredValue(event.target.value),
+            }),
+            h(
+              'button',
+              { type: 'button', className: 'mc-btn', disabled: busy === 'cred', onClick: storeCredential },
+              busy === 'cred' ? t('saving') : t('credSave'),
+            ),
+          ),
+          credNote ? h('p', { className: 'mc-hint' }, credNote) : null,
+        ),
         errors.length > 0
           ? h(Note, { kind: 'error' }, errors.join('；'))
           : null,
@@ -930,7 +1015,7 @@ window.__ModuleLoader__.load({
 
     // ── one registry row ──────────────────────────────────────────────────────
 
-    function ServerItem({ server, t, locale, busy, onAction }) {
+    function ServerItem({ server, t, locale, busy, onAction, credentialRefs }) {
       const [open, setOpen] = useState(false)
       const [confirming, setConfirming] = useState(false)
       const lastSuccess = formatTime(server.lastSuccessAt, locale)
@@ -1070,6 +1155,28 @@ window.__ModuleLoader__.load({
             ),
             h('p', { className: 'mc-hint' }, t('toolsLabel')),
             h(ToolList, { tools: server.tools, t }),
+            credentialRefs && credentialRefs.length > 0
+              ? h(
+                'div',
+                null,
+                h('p', { className: 'mc-hint' }, t('credUsed')),
+                h(
+                  'ul',
+                  { className: 'mc-list-plain' },
+                  credentialRefs.map((item) => h(
+                    'li',
+                    { key: item.ref },
+                    h('code', { className: 'mc-mono' }, `\${credential:${item.ref}}`),
+                    ' · ',
+                    h(
+                      'span',
+                      { className: item.configured ? 'mc-cred-ok' : 'mc-cred-miss' },
+                      item.configured ? t('credOk', { source: item.source }) : t('credMissing'),
+                    ),
+                  )),
+                ),
+              )
+              : null,
             error ? h(Diagnostic, { error, t }) : null,
           )
           : null,
@@ -1344,6 +1451,7 @@ window.__ModuleLoader__.load({
       const stats = snapshot?.stats
       const servers = snapshot?.servers ?? []
       const policy = snapshot?.config
+      const credentialStatus = new Map((snapshot?.credentials ?? []).map((entry) => [entry.id, entry.refs]))
 
       return h(
         'div',
@@ -1455,6 +1563,7 @@ window.__ModuleLoader__.load({
               locale,
               busy: busyId?.id === server.id ? busyId.action : '',
               onAction: act,
+              credentialRefs: credentialStatus.get(server.id) ?? [],
             })),
           ),
       )

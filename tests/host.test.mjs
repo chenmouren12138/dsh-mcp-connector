@@ -20,11 +20,12 @@ function check(name, fn) {
     .catch((error) => results.push({ name, ok: false, error }))
 }
 
-function mockCtx() {
+function mockCtx({ credentials } = {}) {
   const registered = new Map()
   const effects = []
   const events = []
   const ctx = {
+    credentials,
     tools: {
       register(definition) {
         if (registered.has(definition.name)) throw new Error(`duplicate tool ${definition.name}`)
@@ -33,7 +34,9 @@ function mockCtx() {
       },
     },
     get(name) {
-      return name === 'tools' ? this.tools : undefined
+      if (name === 'tools') return this.tools
+      if (name === 'credentials') return this.credentials
+      return undefined
     },
     effect(fn) {
       const dispose = fn()
@@ -420,6 +423,80 @@ try {
     parseSseStream('data: {"d":4}\n\n', (event) => lf.push(event))
     assert.equal(lf.length, 1)
     assert.equal(lf[0].data, '{"d":4}')
+  })
+
+  await check('凭据引用：解析、缺失诊断与不落盘', async () => {
+    const { collectCredentialRefs, resolveCredentials, describeCredentials } = await import(
+      pathToFileURL(path.join(ROOT, 'lib', 'credentials.js')).href
+    )
+    const config = {
+      transport: 'streamable-http',
+      url: 'https://example.invalid/mcp',
+      headers: { 'modao-token': '${credential:MODAO_TOKEN}', 'x-plain': 'literal' },
+    }
+    assert.deepEqual(collectCredentialRefs(config), ['MODAO_TOKEN'])
+
+    const resolved = await resolveCredentials(config, { resolve: async () => 'secret-value' })
+    assert.equal(resolved.headers['modao-token'], 'secret-value')
+    assert.equal(resolved.headers['x-plain'], 'literal')
+    // The source config keeps the placeholder.
+    assert.equal(config.headers['modao-token'], '${credential:MODAO_TOKEN}')
+
+    await assert.rejects(
+      () => resolveCredentials(config, { resolve: async () => undefined }),
+      (error) => error.code === 'CREDENTIAL_MISSING' && error.detail.refs.includes('MODAO_TOKEN'),
+    )
+
+    const status = await describeCredentials(config, {
+      describe: async () => ({ configured: false }),
+      env: { MODAO_TOKEN: 'from-env' },
+    })
+    assert.equal(status[0].configured, true)
+    assert.equal(status[0].source, 'environment')
+  })
+
+  await check('凭据引用：连上后配置里仍是占位符', async () => {
+    process.env.TEST_CRED = 'resolved-at-connect'
+    try {
+      const result = await runtime.addServer({
+        serverName: 'cred',
+        config: { transport: 'stdio', command: process.execPath, args: [SERVER], env: { TEST_CRED: '${credential:TEST_CRED}' } },
+      })
+      const state = runtime.snapshot().servers.find((item) => item.id === result.receipt.id)
+      assert.equal(state.state, 'ready', JSON.stringify(state.lastError))
+      assert.equal(state.config.env.TEST_CRED, '已设置')
+      assert.deepEqual(state.credentialRefs, ['TEST_CRED'])
+      const onDisk = JSON.parse(await fs.readFile(path.join(DATA, 'registry.json'), 'utf8'))
+      const record = onDisk.servers.find((item) => item.serverName === 'cred')
+      assert.equal(record.config.env.TEST_CRED, '${credential:TEST_CRED}')
+      assert.ok(!JSON.stringify(onDisk).includes('resolved-at-connect'))
+      const status = await runtime.credentialStatus(result.receipt.id)
+      assert.equal(status[0].refs[0].configured, true)
+      await runtime.removeServer(result.receipt.id)
+    } finally {
+      delete process.env.TEST_CRED
+    }
+  })
+
+  await check('凭据缺失时探测返回 CREDENTIAL_MISSING', async () => {
+    const probe = await runtime.testConnection({
+      serverName: 'cred-missing',
+      config: {
+        transport: 'streamable-http',
+        url: 'https://example.invalid/mcp',
+        headers: { 'modao-token': '${credential:NOT_CONFIGURED_ANYWHERE}' },
+      },
+    })
+    assert.equal(probe.ok, false)
+    assert.equal(probe.error.code, 'CREDENTIAL_MISSING')
+    assert.equal(probe.error.phase, 'config')
+  })
+
+  await check('没有凭据服务时给出明确诊断', async () => {
+    await assert.rejects(
+      () => runtime.putCredential('SOME_REF', 'value'),
+      (error) => error.code === 'CREDENTIAL_UNAVAILABLE',
+    )
   })
 
   await check('持久化：重新加载注册表', async () => {

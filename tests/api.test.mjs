@@ -180,13 +180,23 @@ await check('导入校验失败返回逐条原因而非写入', async () => {
 })
 
 await check('actions 列表覆盖页面用到的全部动作', async () => {
-  for (const action of ['state', 'addServer', 'updateServer', 'removeServer', 'setDisabled', 'retryServer', 'refreshServer', 'testConnection', 'importJson', 'exportJson', 'health']) {
+  for (const action of ['state', 'addServer', 'updateServer', 'removeServer', 'setDisabled', 'retryServer', 'refreshServer', 'testConnection', 'importJson', 'exportJson', 'credentialStatus', 'setCredential', 'unsetCredential', 'health']) {
     const res = await callRoute('api', 'POST', { action: 'definitely-not-' + action })
     assert.equal(res.json.error.code, 'UNKNOWN_ACTION', action)
   }
   const exportRes = await callRoute('api', 'POST', { action: 'exportJson', payload: { format: 'array' } })
   assert.equal(exportRes.json.ok, true)
   assert.ok(Array.isArray(exportRes.json.data.document))
+})
+
+await check('凭据状态随快照返回，部署无凭据服务时明确报错', async () => {
+  const snapshot = await callRoute('api', 'GET')
+  assert.ok(Array.isArray(snapshot.json.data.credentials))
+  assert.equal(snapshot.json.data.credentials[0].serverName, 'bridge')
+  assert.deepEqual(snapshot.json.data.credentials[0].refs, [])
+  const res = await callRoute('api', 'POST', { action: 'setCredential', payload: { ref: 'DEMO_REF', value: 'x' } })
+  assert.equal(res.record.status, 400)
+  assert.equal(res.json.error.code, 'CREDENTIAL_UNAVAILABLE')
 })
 
 await check('删除后 health 归零', async () => {
