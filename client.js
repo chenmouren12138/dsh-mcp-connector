@@ -303,6 +303,8 @@ window.__ModuleLoader__.load({
 
     // ── styles ────────────────────────────────────────────────────────────────
     const CSS = [
+      '.mc-sticky{position:sticky;top:0;z-index:4;display:flex;flex-direction:column;gap:14px;',
+      'padding:4px 0 10px;margin:-4px 0 0;background:var(--dsw-alias-bg-base)}',
       '.mc-root{display:flex;flex-direction:column;gap:14px;width:100%;max-width:760px;',
       'color:var(--dsw-alias-label-primary)}',
       '.mc-head{display:flex;flex-direction:column;gap:4px}',
@@ -2553,6 +2555,7 @@ window.__ModuleLoader__.load({
       return h(
         'div',
         { className: 'mc-root' },
+        h('div', { className: 'mc-sticky' },
         h(
           'header',
           { className: 'mc-head' },
@@ -2720,6 +2723,7 @@ window.__ModuleLoader__.load({
           )
           : null,
 
+        ),
         servers.length === 0 && snapshot
           ? h(
             'div',
