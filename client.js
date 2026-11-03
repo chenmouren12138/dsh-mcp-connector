@@ -1558,28 +1558,17 @@ window.__ModuleLoader__.load({
                           commitRows(next)
                         },
                       }),
-                      h(
-                        'button',
-                        {
-                          type: 'button',
-                          className: 'mc-icon-btn',
-                          'aria-label': revealed[index] ? t('headerHide') : t('headerReveal'),
-                          title: revealed[index] ? t('headerHide') : t('headerReveal'),
-                          onClick: () => setRevealed((current) => ({ ...current, [index]: !current[index] })),
-                        },
-                        h(Icon, { name: revealed[index] ? 'eyeOff' : 'eye' }),
-                      ),
-                      h(
-                        'button',
-                        {
-                          type: 'button',
-                          className: 'mc-icon-btn',
-                          'aria-label': t('headerRemove'),
-                          title: t('headerRemove'),
-                          onClick: () => commitRows(rows.filter((_item, i) => i !== index)),
-                        },
-                        h(Icon, { name: 'trash' }),
-                      ),
+                      h(TipButton, {
+                        label: revealed[index] ? t('headerHide') : t('headerReveal'),
+                        icon: revealed[index] ? 'eyeOff' : 'eye',
+                        onClick: () => setRevealed((current) => ({ ...current, [index]: !current[index] })),
+                      }),
+                      h(TipButton, {
+                        label: t('headerRemove'),
+                        icon: 'trash',
+                        className: 'mc-act-danger',
+                        onClick: () => commitRows(rows.filter((_item, i) => i !== index)),
+                      }),
                     )),
                   )
                   : null,
