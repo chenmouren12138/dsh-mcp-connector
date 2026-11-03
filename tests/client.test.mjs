@@ -800,6 +800,37 @@ await check('JSON 标签：一键优化格式化、保存基于 JSON 文本、�
   assert.equal(call.payload.config.command, 'node')
 })
 
+await check('一键优化：把不合法 JSON 修成合法 JSON', async () => {
+  root = mount()
+  await flush()
+  byText(root, '添加 MCP').props.onClick()
+  await flush()
+  const panelOf = () => findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
+  const areaOf = () => findAll(panelOf(), (node) => node.type === 'textarea' && node.props?.['aria-label'] === 'JSON')[0]
+
+  byText(panelOf(), 'JSON').props.onClick()
+  await flush()
+  const broken = "{ probe: { command: 'node', args: ['x',], }, // note\n}"
+  areaOf().props.onChange({ target: { value: broken } })
+  rerender()
+
+  byText(panelOf(), '一键优化').props.onClick()
+  rerender()
+  const fixed = areaOf().props.value
+  const parsed = JSON.parse(fixed)
+  assert.equal(parsed.probe?.command, 'node', 'unquoted key and single quotes repaired')
+  assert.deepEqual(parsed.probe.args, ['x'], 'trailing comma dropped')
+  assert.match(textOf(panelOf()), /已修复 \d+ 处/, 'repair is reported')
+
+  // The repaired document is immediately usable.
+  byText(panelOf(), '添加 MCP').props.onClick()
+  await flush()
+  const call = calls.filter((item) => item.action === 'addServer').at(-1)
+  assert.ok(call, 'save works after repair')
+  assert.equal(call.payload.serverName, 'probe')
+  assert.equal(call.payload.config.command, 'node')
+})
+
 await check('OAuth：卡片上的授权 / 取消授权按钮调用对应动作', async () => {
   snapshot = {
     ...snapshot,

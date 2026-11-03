@@ -98,7 +98,9 @@ window.__ModuleLoader__.load({
       timeoutError: '超时时间至少 1000 毫秒，或留空使用默认。',
       headerMaskedValue: '请求头「{name}」的值是掩码占位符（••••），请重新输入真实值。',
       jsonOptimize: '一键优化',
+      jsonRepaired: '已修复 {count} 处并整理为标准格式',
       jsonOptimized: '已整理为标准格式',
+      jsonOptimizeHint: '整理为标准 JSON；单引号、注释、尾逗号、未加引号的键会自动修复',
       namePlaceholder: '例如 github-search',
       agentNameHint: 'Agent 将看到 serverName：{name}',
       urlPlaceholder: 'https://example.com/mcp',
@@ -215,7 +217,9 @@ window.__ModuleLoader__.load({
       timeoutError: 'Use at least 1000 ms, or leave it blank for the default.',
       headerMaskedValue: 'Header “{name}” still holds the mask placeholder (••••); enter the real value.',
       jsonOptimize: 'Tidy up',
+      jsonRepaired: 'Repaired {count} issue(s) and formatted',
       jsonOptimized: 'Formatted',
+      jsonOptimizeHint: 'Normalise to strict JSON; fixes quotes, comments, trailing commas and bare keys',
       namePlaceholder: 'e.g. github-search',
       agentNameHint: 'Agents will see serverName: {name}',
       urlPlaceholder: 'https://example.com/mcp',
@@ -789,6 +793,126 @@ window.__ModuleLoader__.load({
       if (typeof window !== 'undefined' && typeof window.open === 'function') window.open(url, '_blank', 'noopener')
     }
 
+    /**
+     * Repair the mistakes people actually make when pasting MCP config: single or
+     * smart quotes, // and /* *\/ comments, unquoted keys and bare words,
+     * trailing commas, and full-width punctuation from a Chinese IME.
+     * Returns strict-JSON text plus a tally of what changed.
+     */
+    function repairJson(input) {
+      const notes = { quotes: 0, keys: 0, comments: 0, trailing: 0, punctuation: 0, bare: 0 }
+      const src = String(input ?? '').replace(/^\uFEFF/, '')
+      const tokens = []
+      let i = 0
+      const quoteOf = { '"': '"', "'": "'", '\u201c': '\u201d', '\u201d': '\u201d', '\u2018': '\u2019', '\u2019': '\u2019' }
+      while (i < src.length) {
+        const ch = src[i]
+        if (/\s/.test(ch)) {
+          tokens.push({ kind: 'ws', text: ch })
+          i += 1
+          continue
+        }
+        if (ch === '/' && src[i + 1] === '/') {
+          while (i < src.length && src[i] !== '\n') i += 1
+          notes.comments += 1
+          continue
+        }
+        if (ch === '/' && src[i + 1] === '*') {
+          const end = src.indexOf('*/', i + 2)
+          i = end < 0 ? src.length : end + 2
+          notes.comments += 1
+          continue
+        }
+        if (Object.hasOwn(quoteOf, ch)) {
+          const closer = quoteOf[ch]
+          let value = ''
+          i += 1
+          let closed = false
+          while (i < src.length) {
+            const c = src[i]
+            if (c === '\\') {
+              value += c + (src[i + 1] ?? '')
+              i += 2
+              continue
+            }
+            if (c === closer) {
+              i += 1
+              closed = true
+              break
+            }
+            if (c === '\n') {
+              value += '\\n'
+              i += 1
+              continue
+            }
+            value += c
+            i += 1
+          }
+          if (!closed) throw new Error('字符串没有闭合')
+          if (ch !== '"') notes.quotes += 1
+          tokens.push({ kind: 'string', text: JSON.stringify(value) })
+          continue
+        }
+        const fullwidth = { '\uff0c': ',', '\uff1a': ':', '\uff5b': '{', '\uff5d': '}', '\uff3b': '[', '\uff3d': ']' }
+        if (fullwidth[ch] !== undefined) {
+          tokens.push({ kind: 'punc', text: fullwidth[ch] })
+          notes.punctuation += 1
+          i += 1
+          continue
+        }
+        if ('{}[]:,'.includes(ch)) {
+          tokens.push({ kind: 'punc', text: ch })
+          i += 1
+          continue
+        }
+        const number = /^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/.exec(src.slice(i))
+        if (number) {
+          tokens.push({ kind: 'number', text: number[0] })
+          i += number[0].length
+          continue
+        }
+        const word = /^[A-Za-z_$][\w$.-]*/.exec(src.slice(i))
+        if (word) {
+          const after = src.slice(i + word[0].length).replace(/^\s+/, '')[0]
+          if (after === ':') {
+            tokens.push({ kind: 'string', text: JSON.stringify(word[0]) })
+            notes.keys += 1
+          } else if (word[0] === 'true' || word[0] === 'false' || word[0] === 'null') {
+            tokens.push({ kind: 'literal', text: word[0] })
+          } else {
+            tokens.push({ kind: 'string', text: JSON.stringify(word[0]) })
+            notes.bare += 1
+          }
+          i += word[0].length
+          continue
+        }
+        // Unknown character: drop it rather than fail the whole repair.
+        notes.punctuation += 1
+        i += 1
+      }
+
+      const out = []
+      for (let k = 0; k < tokens.length; k += 1) {
+        const token = tokens[k]
+        if (token.kind === 'punc' && token.text === ',') {
+          let j = k + 1
+          while (j < tokens.length && tokens[j].kind === 'ws') j += 1
+          const next = tokens[j]
+          if (next && next.kind === 'punc' && (next.text === '}' || next.text === ']')) {
+            notes.trailing += 1
+            continue
+          }
+        }
+        out.push(token.text)
+      }
+      return { text: out.join(''), notes }
+    }
+
+    /** How many separate problems a repair fixed. */
+    function repairCount(notes) {
+      return Object.values(notes ?? {}).reduce((total, value) => total + (Number(value) || 0), 0)
+    }
+
     /** Split JSON text into coloured tokens for the highlight layer. */
     function jsonTokens(text) {
       const tokens = []
@@ -867,10 +991,22 @@ window.__ModuleLoader__.load({
       timeoutMs: '',
     }
 
+    /** Transport from the config, tolerating the dialect spellings and inferring it. */
+    function inferTransport(config) {
+      const raw = String(config.transport ?? config.type ?? config.kind ?? '').toLowerCase()
+      if (raw === 'stdio' || raw === 'local' || raw === 'process') return 'stdio'
+      if (raw === 'sse') return 'sse'
+      if (raw !== '') return 'streamable-http'
+      // No transport field: a command means stdio, a url means HTTP.
+      if (typeof config.command === 'string' && config.command !== '') return 'stdio'
+      if (typeof config.url === 'string' && config.url !== '') return 'streamable-http'
+      return 'stdio'
+    }
+
     function draftOf(server) {
       const config = server.config ?? {}
       const timeoutMs = typeof config.toolCallTimeoutMs === 'number' ? String(config.toolCallTimeoutMs) : ''
-      if (config.transport === 'stdio') {
+      if (inferTransport(config) === 'stdio') {
         return {
           serverName: server.serverName,
           transport: 'stdio',
@@ -885,7 +1021,7 @@ window.__ModuleLoader__.load({
       }
       return {
         serverName: server.serverName,
-        transport: config.transport === 'sse' ? 'sse' : 'streamable-http',
+        transport: inferTransport(config) === 'sse' ? 'sse' : 'streamable-http',
         command: '',
         argsText: '',
         envText: '',
@@ -1160,19 +1296,35 @@ window.__ModuleLoader__.load({
         }
       }, [jsonText, t])
 
-      /** Pretty-print and normalise the JSON tab content. */
+      /**
+       * Pretty-print and normalise the JSON tab content. Strict JSON first; when
+       * that fails, the tolerant repairer gets a turn so a paste with single
+       * quotes or a trailing comma still lands in a usable shape.
+       */
       const formatJson = useCallback(() => {
+        let parsed
+        let repaired = 0
         try {
-          const parsed = entryToDraft(JSON.parse(jsonText))
-          setDraft({ ...parsed })
-          setRowList(headerRows(parsed.headersText))
-          setJsonText(JSON.stringify(draftToEntry(parsed), null, 2))
-          setJsonError('')
-          setJsonNotice(t('jsonOptimized'))
-          setTimeout(() => setJsonNotice(''), 2400).unref?.()
-        } catch (error) {
-          setJsonError(t('jsonInvalid', { message: error.message }))
+          parsed = entryToDraft(JSON.parse(jsonText))
+        } catch (strictError) {
+          let repairedText = ''
+          try {
+            const repair = repairJson(jsonText)
+            repairedText = repair.text
+            parsed = entryToDraft(JSON.parse(repairedText))
+            repaired = repairCount(repair.notes)
+          } catch {
+            setJsonError(t('jsonInvalid', { message: strictError.message }))
+            setJsonNotice('')
+            return
+          }
         }
+        setDraft({ ...parsed })
+        setRowList(headerRows(parsed.headersText))
+        setJsonText(JSON.stringify(draftToEntry(parsed), null, 2))
+        setJsonError('')
+        setJsonNotice(repaired > 0 ? t('jsonRepaired', { count: repaired }) : t('jsonOptimized'))
+        setTimeout(() => setJsonNotice(''), 3200).unref?.()
       }, [jsonText, t])
 
       const runProbe = useCallback(async () => {
@@ -1339,7 +1491,7 @@ window.__ModuleLoader__.load({
                       : jsonNotice ? h('span', { className: 'mc-json-notice', role: 'status' }, jsonNotice) : null,
                     h(
                       'button',
-                      { type: 'button', className: 'mc-link-btn', onClick: formatJson },
+                      { type: 'button', className: 'mc-link-btn', title: t('jsonOptimizeHint'), onClick: formatJson },
                       t('jsonOptimize'),
                     ),
                   ),
