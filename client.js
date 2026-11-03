@@ -440,11 +440,14 @@ window.__ModuleLoader__.load({
       'color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-3);',
       'border:.5px solid var(--dsw-alias-border-l3);box-shadow:0 6px 18px rgba(0,0,0,.18);',
       'transition:opacity .12s ease,transform .12s ease;transition-delay:.18s}',
-      '.mc-tip-wrap:hover>.mc-tip,.mc-tip-wrap:focus-within>.mc-tip{opacity:1;transform:translate(-50%,0)}',
+      '.mc-tip-wrap:hover>.mc-tip{opacity:1;transform:translate(-50%,0)}',
+      '@supports selector(:has(*)){.mc-tip-wrap:has(:focus-visible)>.mc-tip{opacity:1;transform:translate(-50%,0)}}',
       '.mc-actions .mc-tip-wrap:first-child>.mc-tip{left:0;transform:translate(0,2px)}',
       '.mc-actions .mc-tip-wrap:first-child:hover>.mc-tip{transform:translate(0,0)}',
+      '@supports selector(:has(*)){.mc-actions .mc-tip-wrap:first-child:has(:focus-visible)>.mc-tip{opacity:1;transform:translate(0,0)}}',
       '.mc-actions .mc-tip-wrap:last-child>.mc-tip{left:auto;right:0;transform:translate(0,2px)}',
       '.mc-actions .mc-tip-wrap:last-child:hover>.mc-tip{transform:translate(0,0)}',
+      '@supports selector(:has(*)){.mc-actions .mc-tip-wrap:last-child:has(:focus-visible)>.mc-tip{opacity:1;transform:translate(0,0)}}',
 
       // Hover keeps each action's colour; only the fill changes.
       '.mc-act-danger:hover:not(:disabled){color:var(--dsw-alias-state-error-primary);background:var(--dsw-alias-bg-layer-3)}',
