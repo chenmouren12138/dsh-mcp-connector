@@ -196,6 +196,12 @@ let snapshot = {
 }
 
 const handlers = {
+  oauthBegin() {
+    return { url: 'http://127.0.0.1:9876/authorize?state=abc', redirectUri: 'http://127.0.0.1:9877/callback' }
+  },
+  oauthRevoke() {
+    return { receipt: { action: 'oauthRevoke', message: '已取消授权' } }
+  },
   testConnection(payload) {
     if (payload.id !== undefined) {
       return {
@@ -755,6 +761,36 @@ await check('必填校验：空名称点击保存给出红框与小字提示', a
   const after = findAll(panel, (node) => node.type === 'input' && node.props?.['aria-label'] === '服务地址')[0]
   assert.equal(after.props['aria-invalid'], 'true', 'invalid field is marked')
   assert.match(textOf(panel), /必填/, 'small required hint shown')
+})
+
+await check('OAuth：卡片上的授权 / 取消授权按钮调用对应动作', async () => {
+  root = mount()
+  await flush()
+  const listOf = () => findAll(root, (node) => node.props?.className === 'mc-list')[0]
+  const httpCard = () => findAll(listOf(), (node) => node.props?.className === 'mc-item' && textOf(node).includes('broken'))[0]
+
+  const authorize = byAria(httpCard(), '授权')
+  assert.ok(authorize, 'authorize button on http servers')
+  authorize.props.onClick()
+  await flush()
+  const oauthCall = calls.find((item) => item.action === 'oauthBegin')
+  assert.ok(oauthCall, 'oauthBegin called')
+  assert.equal(typeof oauthCall.payload.id, 'string')
+  assert.match(textOf(root), /等待浏览器完成授权/)
+
+  snapshot = {
+    ...snapshot,
+    servers: snapshot.servers.map((item) => (item.id === oauthCall.payload.id
+      ? { ...item, oauth: { status: 'authorized', authorized: true, expiresAt: null, error: null } }
+      : item)),
+  }
+  root = mount()
+  await flush()
+  assert.ok(byAria(httpCard(), '取消授权'), 'revoke button once authorized')
+  assert.match(textOf(httpCard()), /已授权/)
+  byAria(httpCard(), '取消授权').props.onClick()
+  await flush()
+  assert.ok(calls.some((item) => item.action === 'oauthRevoke' && item.payload.id === oauthCall.payload.id))
 })
 
 await check('刷新按钮触发重新拉取并给出已刷新提示', async () => {

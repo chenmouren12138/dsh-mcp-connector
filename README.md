@@ -171,6 +171,25 @@ DSH 插件：在 Cordis 运行时内实现一个 **MCP Client 能力 Seam**，�
 
 写入方式两种：`merge` 按名字 upsert；`replace` 全量覆盖——新增、更新、删除在一次写入里原子完成。导出支持 `{"mcpServers": {…}}`（默认）、裸 map、对象数组。
 
+## OAuth 授权（v1.1.0）
+
+有些 MCP 服务不在配置里放静态令牌，而是要求 OAuth 2.1。插件内置了这条链路（`lib/oauth.js`），不需要任何第三方依赖：
+
+1. **发现**：读取受保护资源元数据（RFC 9728）拿到授权服务器，再读授权服务器元数据（RFC 8414 / OIDC）；
+2. **注册**：有 `registration_endpoint` 就走动态客户端注册（RFC 7591），注册成 `token_endpoint_auth_method=none` 的公共客户端；
+3. **授权**：授权码 + PKCE(S256) + `state` + `resource`（RFC 8707）；回调监听只绑 `127.0.0.1` 的临时端口，授权完自动关闭；
+4. **换票与续期**：`expires_in` 到期前 60 秒自动用 refresh token 换新；换票失败会把状态置为需要重新授权；
+5. **落库**：access / refresh / 元数据写进 DSH 凭据库（`MCP_OAUTH_<服务器>_ACCESS` / `_REFRESH` / `_META`），`registry.json` 里只有引用，界面和诊断都看不到 token。
+
+**界面**：每张 HTTP 服务器卡片上有一个盾牌图标——
+
+- 未授权时是「授权」：点一下把授权地址交给系统浏览器，卡片显示「等待浏览器完成授权…」；
+- 已授权时变成「取消授权」：清掉本地 token 并重连，卡片回到未授权状态。
+
+状态在快照里只以 `oauth.status`（`none` / `pending` / `authorized` / `error`）与 `expiresAt` 出现，不包含任何令牌。
+
+**边界**：服务端必须公开发现元数据，且通常要支持动态注册；两者都没有时会明确报「该服务器没有公开 OAuth 元数据」或「没有提供动态客户端注册」。
+
 ## 可观测性
 
 | 端点 | 内容 |

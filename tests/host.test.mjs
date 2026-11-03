@@ -57,6 +57,16 @@ async function freshData() {
 
 const { apply } = await import(pathToFileURL(path.join(ROOT, 'index.js')).href)
 
+async function waitFor(probe, timeoutMs = 4000) {
+  const started = Date.now()
+  while (Date.now() - started < timeoutMs) {
+    const value = probe()
+    if (value) return value
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  return null
+}
+
 const stdioConfig = () => ({ transport: 'stdio', command: process.execPath, args: [SERVER], env: { TEST_TOKEN: 'sk-secret-value' }, cwd: '' })
 
 // ── scratch HTTP endpoints ─────────────────────────────────────────────────────
@@ -533,6 +543,128 @@ try {
     assert.equal(typeof health.ok, 'boolean')
     assert.equal(typeof health.uptimeMs, 'number')
     assert.equal(health.servers, 0)
+  })
+
+
+  await check('OAuth 授权：发现 → 注册 → 授权码 → 换 token → 连接 → 撤销', async () => {
+    const oauthState = { access: '', refresh: '' }
+    const oauthBase = await startHttp(async (req, res) => {
+      const url = new URL(req.url ?? '/', 'http://127.0.0.1')
+      const json = (body, status = 200, headers = {}) => {
+        res.writeHead(status, { 'content-type': 'application/json', ...headers })
+        res.end(JSON.stringify(body))
+      }
+      if (url.pathname.startsWith('/.well-known/oauth-protected-resource')) {
+        json({ resource: `${oauthBase}/mcp`, authorization_servers: [oauthBase] })
+        return
+      }
+      if (url.pathname === '/.well-known/oauth-authorization-server') {
+        json({
+          issuer: oauthBase,
+          authorization_endpoint: `${oauthBase}/authorize`,
+          token_endpoint: `${oauthBase}/token`,
+          registration_endpoint: `${oauthBase}/register`,
+          scopes_supported: [],
+        })
+        return
+      }
+      if (url.pathname === '/register' && req.method === 'POST') {
+        json({ client_id: 'client-1', token_endpoint_auth_method: 'none' })
+        return
+      }
+      if (url.pathname === '/authorize') {
+        const redirect = url.searchParams.get('redirect_uri')
+        const st = url.searchParams.get('state')
+        assert.ok(url.searchParams.get('code_challenge'), 'PKCE challenge forwarded')
+        assert.equal(url.searchParams.get('code_challenge_method'), 'S256')
+        res.writeHead(302, { location: `${redirect}?code=code-1&state=${encodeURIComponent(st)}` })
+        res.end()
+        return
+      }
+      if (url.pathname === '/token' && req.method === 'POST') {
+        const chunks = []
+        for await (const chunk of req) chunks.push(chunk)
+        const form = new URLSearchParams(Buffer.concat(chunks).toString('utf8'))
+        if (form.get('grant_type') === 'authorization_code') {
+          assert.equal(form.get('code'), 'code-1')
+          assert.ok(form.get('code_verifier'), 'PKCE verifier sent')
+          oauthState.access = 'access-1'
+          oauthState.refresh = 'refresh-1'
+          json({ access_token: oauthState.access, refresh_token: oauthState.refresh, token_type: 'Bearer', expires_in: 3600 })
+          return
+        }
+        json({ error: 'unsupported_grant_type' }, 400)
+        return
+      }
+      if (url.pathname === '/mcp' && req.method === 'POST') {
+        if (oauthState.access === '' || req.headers.authorization !== `Bearer ${oauthState.access}`) {
+          res.writeHead(401, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ error: 'invalid_token' }))
+          return
+        }
+        const chunks = []
+        for await (const chunk of req) chunks.push(chunk)
+        const message = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+        const reply = (result) => {
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ jsonrpc: '2.0', id: message.id, result }))
+        }
+        if (message.method === 'initialize') {
+          reply({ protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'oauth-echo', version: '1.0.0' } })
+          return
+        }
+        if (message.method === 'tools/list') {
+          reply({ tools: [{ name: 'whoami', description: 'whoami', inputSchema: { type: 'object' } }] })
+          return
+        }
+        res.writeHead(202).end()
+        return
+      }
+      res.writeHead(404).end()
+    })
+
+    // The shared runtime is disposed by an earlier case; this flow needs its own.
+    await freshData()
+    const oauthRuntime = apply(ctx, { registry: { dataDir: DATA } })
+    await oauthRuntime.ready
+
+    const added = await oauthRuntime.addServer({
+      serverName: 'oauthdemo',
+      config: { transport: 'streamable-http', url: `${oauthBase}/mcp` },
+    })
+    const id = added.receipt.id
+    const before = await waitFor(() => {
+      const item = oauthRuntime.snapshot().servers.find((entry) => entry.id === id)
+      return item && !['draft', 'connecting', 'initializing'].includes(item.state) ? item : null
+    }, 4000)
+    assert.ok(before, 'server settles before authorization')
+    assert.equal(before.oauth.status, 'none')
+    assert.equal(before.oauth.authorized, false)
+    assert.notEqual(before.state, 'ready', 'unauthorized server does not connect')
+    assert.equal(before.lastError?.code, 'HTTP_AUTH', 'fails with an auth diagnostic')
+
+    const begun = await oauthRuntime.beginOAuth(id)
+    assert.match(begun.url, /response_type=code/)
+    assert.match(begun.redirectUri, /^http:\/\/127\.0\.0\.1:\d+\/callback$/)
+
+    const authorized = await fetch(begun.url, { redirect: 'manual' })
+    const location = authorized.headers.get('location')
+    assert.ok(location?.startsWith(begun.redirectUri), 'redirects back to the loopback listener')
+    const callback = await fetch(location)
+    assert.equal(callback.status, 200)
+
+    const ready = await waitFor(() => {
+      const item = oauthRuntime.snapshot().servers.find((entry) => entry.id === id)
+      return item?.oauth?.authorized === true && item.state === 'ready' ? item : null
+    }, 6000)
+    assert.ok(ready, 'server connects after authorization')
+    assert.ok(registered.has('mcp__oauthdemo__whoami'), 'tools registered after authorization')
+
+    const revoked = await oauthRuntime.revokeOAuth(id)
+    assert.equal(revoked.oauth.status, 'none')
+    assert.equal(oauthRuntime.snapshot().servers.find((entry) => entry.id === id).oauth.authorized, false)
+    await oauthRuntime.removeServer(id)
+    await oauthRuntime.dispose()
   })
 
   await check('事件通过 ctx.emit 广播', () => {

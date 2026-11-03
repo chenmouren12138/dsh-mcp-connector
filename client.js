@@ -38,6 +38,12 @@ window.__ModuleLoader__.load({
       clearSearch: '清除搜索',
       noMatch: '没有匹配「{query}」的服务器',
       rowActions: '该服务器操作',
+      oauthAuthorize: '授权',
+      oauthRevoke: '取消授权',
+      oauthPending: '等待浏览器完成授权…',
+      oauthAuthorized: '已授权',
+      oauthFailed: '授权失败：{message}',
+      oauthUnsupported: '该服务器不支持 OAuth 授权',
       copyTools: '复制工具名',
       copyConfig: '复制配置',
       copyDiagnostic: '复制诊断',
@@ -146,6 +152,12 @@ window.__ModuleLoader__.load({
       clearSearch: 'Clear search',
       noMatch: 'No server matches “{query}”',
       rowActions: 'Server actions',
+      oauthAuthorize: 'Authorize',
+      oauthRevoke: 'Revoke',
+      oauthPending: 'Waiting for the browser to finish…',
+      oauthAuthorized: 'Authorized',
+      oauthFailed: 'Authorization failed: {message}',
+      oauthUnsupported: 'This server does not support OAuth',
       copyTools: 'Copy tool names',
       copyConfig: 'Copy config',
       copyDiagnostic: 'Copy diagnostic',
@@ -395,6 +407,9 @@ window.__ModuleLoader__.load({
       '.mc-act-edit{color:var(--dsw-alias-label-secondary)}',
       '.mc-act-power[data-tone="on"]{color:var(--dsw-alias-state-success-primary,var(--dsw-alias-state-business-primary))}',
       '.mc-act-danger{color:var(--dsw-alias-state-error-primary)}',
+      '.mc-act-shield{color:var(--dsw-alias-state-business-primary)}',
+      '.mc-act-shield-on{color:var(--dsw-alias-state-success-primary,var(--dsw-alias-state-business-primary))}',
+      '.mc-oauth-ok{color:var(--dsw-alias-state-success-primary,var(--dsw-alias-state-business-primary))}',
       '.mc-tip-wrap{position:relative;display:inline-flex;flex:none}',
       '.mc-tip{position:absolute;left:50%;bottom:calc(100% + 6px);z-index:70;',
       'transform:translate(-50%,2px);opacity:0;pointer-events:none;white-space:nowrap;',
@@ -631,6 +646,8 @@ window.__ModuleLoader__.load({
       plug: 'M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0V8ZM12 17v4',
       power: 'M12 3v9M6.6 6.6a8 8 0 1 0 11 0',
       pencil: 'M4 20h4L19 9l-4-4L4 16v4Zm10-14 4 4',
+      shield: 'M12 3l7 3v6c0 4.2-2.9 7.6-7 9-4.1-1.4-7-4.8-7-9V6l7-3Zm-2.5 9l2 2 4-4',
+      shieldOff: 'M12 3l7 3v6c0 4.2-2.9 7.6-7 9-4.1-1.4-7-4.8-7-9V6l7-3ZM4 4l16 16',
       eyeOff: 'M3 3l18 18M10.6 6.1A10.6 10.6 0 0 1 12 6c6.4 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7.4A17.4 17.4 0 0 0 2 12s3.6 6 10 6a10.4 10.4 0 0 0 4-.8',
     }
 
@@ -728,6 +745,20 @@ window.__ModuleLoader__.load({
     function Note({ kind = 'info', children }) {
       const className = kind === 'error' ? 'mc-note mc-note-error' : kind === 'ok' ? 'mc-note mc-note-ok' : 'mc-note'
       return h('p', { className, role: kind === 'error' ? 'alert' : undefined }, children)
+    }
+
+    /** Open an external URL; a real anchor survives popup blockers. */
+    function openExternal(url) {
+      if (typeof document === 'undefined' || typeof document.createElement !== 'function') return
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.target = '_blank'
+      anchor.rel = 'noreferrer noopener'
+      if (typeof anchor.click === 'function') {
+        anchor.click()
+        return
+      }
+      if (typeof window !== 'undefined' && typeof window.open === 'function') window.open(url, '_blank', 'noopener')
     }
 
     /** One discovered tool row: raw name plus the exact public name agents see. */
@@ -1589,6 +1620,15 @@ window.__ModuleLoader__.load({
               disabled: busy !== '',
               onClick: () => onAction(server.disabled ? 'enable' : 'disable', server),
             }),
+            server.config.transport !== 'stdio'
+              ? h(TipButton, {
+                label: server.oauth?.authorized ? t('oauthRevoke') : t('oauthAuthorize'),
+                icon: server.oauth?.authorized ? 'shieldOff' : 'shield',
+                className: server.oauth?.authorized ? 'mc-act-shield-on' : 'mc-act-shield',
+                disabled: busy !== '' || server.oauth?.status === 'pending',
+                onClick: () => onAction(server.oauth?.authorized ? 'oauthRevoke' : 'oauth', server),
+              })
+              : null,
             h(TipButton, {
               label: t('edit'),
               icon: 'pencil',
@@ -1629,6 +1669,13 @@ window.__ModuleLoader__.load({
           server.toolCount > 0 ? ` · ${t('toolsCount', { count: server.toolCount })}` : null,
           error ? h('span', { className: 'mc-err' }, ` · ${error.code}：${error.message}`) : null,
         ),
+        server.oauth?.status === 'pending'
+          ? h('p', { className: 'mc-hint' }, t('oauthPending'))
+          : server.oauth?.status === 'authorized'
+            ? h('p', { className: 'mc-hint mc-oauth-ok' }, `${t('oauthAuthorized')}${server.oauth.expiresAt ? ` · ${formatTime(server.oauth.expiresAt, locale)}` : ''}`)
+            : server.oauth?.status === 'error'
+              ? h('p', { className: 'mc-hint mc-err' }, t('oauthFailed', { message: server.oauth.error?.message ?? '' }))
+              : null,
         server.disabled
           ? h('p', { className: 'mc-hint' }, t('hintDisabled'))
           : server.state === 'error'
@@ -1886,6 +1933,19 @@ window.__ModuleLoader__.load({
           if (action === 'enable' || action === 'disable') {
             const data = await request('setDisabled', { id: server.id, disabled: action === 'disable' })
             message = data?.receipt?.message ?? ''
+          }
+          if (action === 'oauth') {
+            const data = await request('oauthBegin', { id: server.id })
+            if (data?.url) openExternal(data.url)
+            setFeedback((current) => ({ ...current, [server.id]: { kind: 'ok', message: t('oauthPending') } }))
+            await refresh()
+            return
+          }
+          if (action === 'oauthRevoke') {
+            const data = await request('oauthRevoke', { id: server.id })
+            setFeedback((current) => ({ ...current, [server.id]: { kind: 'ok', message: data?.receipt?.message ?? t('oauthRevoke') } }))
+            await refresh()
+            return
           }
           if (action === 'remove') {
             const data = await request('removeServer', { id: server.id })

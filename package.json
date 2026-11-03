@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-mcp-connector",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "MCP 连接器：在 DSH 运行时内实现 MCP Client 能力，把外部 MCP 服务器的工具动态映射到工具运行时（mcp__<server>__<tool>），并提供设置页内的服务器注册表 CRUD、连接测试、状态诊断与 JSON 导入导出。",
   "type": "module",
