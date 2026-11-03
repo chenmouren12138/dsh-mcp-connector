@@ -9,6 +9,7 @@ import path from 'node:path'
 import os from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { resolveExecutable } from '../lib/transport-stdio.js'
+import { FileCredentialStore } from '../lib/credential-store.js'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.dirname(HERE)
@@ -527,11 +528,22 @@ try {
     assert.equal(probe.error.phase, 'config')
   })
 
-  await check('没有凭据服务时给出明确诊断', async () => {
-    await assert.rejects(
-      () => runtime.putCredential('SOME_REF', 'value'),
-      (error) => error.code === 'CREDENTIAL_UNAVAILABLE',
-    )
+  await check('没有凭据服务时写入本地凭据文件，重启后仍可用', async () => {
+    const stored = await runtime.putCredential('LOCAL_SECRET', 's3cret-value')
+    assert.equal(stored.stored, true)
+
+    const file = path.join(DATA, 'credentials.json')
+    const onDisk = JSON.parse(await fs.readFile(file, 'utf8'))
+    assert.equal(onDisk.LOCAL_SECRET, 's3cret-value')
+
+    // A fresh runtime with the same data dir resolves it without the platform
+    // credential service: that is what a restart looks like.
+    const { ctx: ctxFresh } = mockCtx()
+    const store = new FileCredentialStore({ dir: DATA })
+    assert.equal(await store.get('LOCAL_SECRET'), 's3cret-value')
+    const runtimeFresh = apply(ctxFresh, { registry: { dataDir: DATA } })
+    await runtimeFresh.ready
+    await runtimeFresh.dispose()
   })
 
   await check('持久化：重新加载注册表', async () => {
