@@ -317,18 +317,23 @@ try {
     assert.equal(after.credentials.envKeys[0], 'TEST_TOKEN')
   })
 
-  await check('serverName 不可变', async () => {
-    await assert.rejects(
-      () => runtime.updateServer(stdioId, { serverName: 'renamed', config: stdioConfig() }),
-      (error) => error.code === 'SERVER_NAME_CONFLICT',
-    )
-  })
+  await check('serverName 可以改名，工具前缀随之更新', async () => {
+    const added = await runtime.addServer({ serverName: 'renamable', config: stdioConfig() })
+    const id = added.receipt.id
+    assert.ok(registered.has('mcp__renamable__echo'), 'registered under the original name')
 
-  await check('serverName 重复添加被拒绝', async () => {
+    const renamed = await runtime.updateServer(id, { serverName: 'renamed_ok', config: stdioConfig() })
+    assert.equal(renamed.server.serverName, 'renamed_ok')
+    assert.match(renamed.receipt.message, /改名/)
+    assert.equal(registered.has('mcp__renamable__echo'), false, 'old prefix released')
+    assert.ok(registered.has('mcp__renamed_ok__echo'), 'registered under the new prefix')
+
+    // A name that is already taken is refused.
     await assert.rejects(
-      () => runtime.addServer({ serverName: 'demo', config: stdioConfig() }),
+      () => runtime.updateServer(id, { serverName: 'demo', config: stdioConfig() }),
       (error) => error.code === 'SERVER_NAME_CONFLICT',
     )
+    await runtime.removeServer(id)
   })
 
   await check('仅重试单条连接', async () => {

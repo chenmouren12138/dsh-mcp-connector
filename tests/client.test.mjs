@@ -720,10 +720,10 @@ await check('编辑弹窗与添加弹窗同构：标题、名称锁定、动作�
   assert.equal(dialog.props['aria-label'], '编辑自定义 MCP')
   const text = textOf(dialog)
   assert.match(text, /编辑自定义 MCP/)
-  assert.match(text, /MCP 名称和 serverName 保持不变/)
+  assert.match(text, /改名后工具按新前缀重新注册/)
   assert.match(text, /Agent 将看到 serverName/)
   const nameField = findAll(dialog, (node) => node.type === 'input' && node.props?.['aria-label'] === '服务器名（工具命名空间）')[0]
-  assert.equal(nameField.props.disabled, true, 'serverName is immutable while editing')
+  assert.equal(nameField.props.disabled, undefined, 'the name can be edited')
   assert.ok(text.indexOf('取消') < text.indexOf('保存 MCP'), 'primary action sits last')
   byText(dialog, '取消').props.onClick()
   await flush()
