@@ -634,6 +634,34 @@ await check('添加 MCP 调用 addServer 并展示挂载回执', async () => {
   assert.match(textOf(root), /已添加服务器/)
 })
 
+await check('类型标签：按传输筛选、右上角数量、默认全部', async () => {
+  root = mount()
+  await flush()
+  const isTab = (node) => String(node.props?.className ?? '').split(' ').includes('mc-type-tab')
+  const tabsOf = () => findAll(root, (node) => node.props?.className === 'mc-type-tabs')[0]
+  const tabOf = (label) => findAll(tabsOf(), (node) => isTab(node) && textOf(node).startsWith(label))[0]
+  const countOf = (tab) => Number(textOf(findAll(tab, (node) => node.props?.className === 'mc-type-tab-count')[0]))
+  const rowsOf = () => findAll(root, (node) => node.props?.className === 'mc-item')
+
+  assert.ok(tabsOf(), 'type tabs rendered')
+  assert.equal(tabsOf().props.role, 'tablist')
+  const total = countOf(tabOf('全部'))
+  assert.equal(total, rowsOf().length, 'all matches the rendered rows')
+  assert.ok(countOf(tabOf('stdio')) >= 1, 'stdio count present')
+  assert.equal(tabOf('全部').props['aria-selected'], true, 'all is selected by default')
+
+  tabOf('stdio').props.onClick()
+  rerender()
+  assert.equal(tabOf('stdio').props['aria-selected'], true, 'stdio selected')
+  assert.equal(tabOf('全部').props['aria-selected'], false, 'all deselected')
+  assert.equal(rowsOf().length, countOf(tabOf('stdio')), 'rows match the stdio count')
+  assert.equal(findAll(root, (node) => node.props?.className === 'mc-item' && textOf(node).includes('broken')).length, 0, 'http row filtered out')
+
+  tabOf('全部').props.onClick()
+  rerender()
+  assert.equal(rowsOf().length, total, 'back to everything')
+})
+
 await check('列表行动作：禁用 / 重试 / 测试 / 删除二次确认', async () => {
   root = mount()
   await flush()

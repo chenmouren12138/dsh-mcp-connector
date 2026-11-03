@@ -95,6 +95,18 @@ window.__ModuleLoader__.load({
       dialogClose: '关闭',
       tabForm: '表单',
       tabJson: 'JSON',
+      typeTabs: 'Filter by type',
+      tabAll: 'All',
+      tabStdio: 'stdio',
+      tabHttp: 'Streamable HTTP',
+      tabSse: 'SSE',
+      noTypeMatch: 'No {type} server yet',
+      typeTabs: '按类型筛选',
+      tabAll: '全部',
+      tabStdio: 'stdio',
+      tabHttp: 'Streamable HTTP',
+      tabSse: 'SSE',
+      noTypeMatch: '{type} 类型下还没有服务器',
       jsonHint: '可直接编辑该服务器的 JSON；切回表单会应用合法内容。',
       jsonInvalid: 'JSON 不合法：{message}',
       actionAdd: '添加 MCP',
@@ -299,6 +311,13 @@ window.__ModuleLoader__.load({
       '.mc-btn:focus-visible,.mc-input:focus-visible,.mc-textarea:focus-visible,.mc-select:focus-visible',
       '{outline:var(--dsw-focus-ring-width) solid',
       'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:2px}',
+      '.mc-type-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}',
+      '.mc-type-tab{display:inline-flex;align-items:flex-start;gap:6px;padding:5px 10px;border-radius:var(--dsw-radius-sm);border:1px solid var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;cursor:pointer;transition:background .15s ease,color .15s ease,border-color .15s ease}',
+      '.mc-type-tab:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}',
+      '.mc-type-tab.is-active{background:var(--dsw-alias-bg-layer-3);border-color:var(--dsw-alias-border-l3);color:var(--dsw-alias-label-primary)}',
+      '.mc-type-tab-label{line-height:16px}',
+      '.mc-type-tab-count{min-width:16px;padding:0 4px;border-radius:8px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:16px;text-align:center;align-self:flex-start}',
+      '.mc-type-tab.is-active .mc-type-tab-count{color:var(--dsw-alias-label-secondary)}',
       '.mc-list-editor{list-style:none;margin:0;padding:0}',
       '.mc-list-editor .mc-panel{margin-top:2px}',
       '.mc-editor-standalone{margin:0 0 10px}',
@@ -2215,6 +2234,7 @@ window.__ModuleLoader__.load({
       const [toast, setToast] = useState('')
       const [probeReport, setProbeReport] = useState(null)
       const [query, setQuery] = useState('')
+      const [typeFilter, setTypeFilter] = useState('all')
       const [refreshing, setRefreshing] = useState(false)
       const [refreshNote, setRefreshNote] = useState('')
       const [feedback, setFeedback] = useState({})
@@ -2433,9 +2453,23 @@ window.__ModuleLoader__.load({
         if (left !== right) return right - left
         return String(a.serverName ?? '').localeCompare(String(b.serverName ?? ''))
       }
+      const typeOf = (server) => server.config?.transport ?? 'streamable-http'
+      const typeCounts = { all: servers.length, stdio: 0, 'streamable-http': 0, sse: 0 }
+      for (const server of servers) {
+        const type = typeOf(server)
+        if (type in typeCounts) typeCounts[type] += 1
+      }
+      const typeTabs = [
+        { key: 'all', label: t('tabAll'), count: typeCounts.all },
+        { key: 'stdio', label: t('tabStdio'), count: typeCounts.stdio },
+        { key: 'streamable-http', label: t('tabHttp'), count: typeCounts['streamable-http'] },
+        { key: 'sse', label: t('tabSse'), count: typeCounts.sse },
+      ].filter((tab) => tab.key === 'all' || tab.count > 0)
+
+      const matchesType = (server) => typeFilter === 'all' || typeOf(server) === typeFilter
       const visible = (needle === ''
-        ? [...servers]
-        : servers.filter((server) => String(server.serverName ?? '').toLowerCase().includes(needle))
+        ? servers.filter(matchesType)
+        : servers.filter(matchesType).filter((server) => String(server.serverName ?? '').toLowerCase().includes(needle))
       ).sort(newestFirst)
 
       return h(
@@ -2588,6 +2622,26 @@ window.__ModuleLoader__.load({
 
         toast ? h(Note, { kind: 'ok' }, toast) : null,
 
+        servers.length > 0
+          ? h(
+            'div',
+            { className: 'mc-type-tabs', role: 'tablist', 'aria-label': t('typeTabs') },
+            typeTabs.map((tab) => h(
+              'button',
+              {
+                key: tab.key,
+                type: 'button',
+                role: 'tab',
+                'aria-selected': typeFilter === tab.key,
+                className: `mc-type-tab${typeFilter === tab.key ? ' is-active' : ''}`,
+                onClick: () => setTypeFilter(tab.key),
+              },
+              h('span', { className: 'mc-type-tab-label' }, tab.label),
+              h('span', { className: 'mc-type-tab-count' }, String(tab.count)),
+            )),
+          )
+          : null,
+
         servers.length === 0 && snapshot
           ? h(
             'div',
@@ -2599,7 +2653,11 @@ window.__ModuleLoader__.load({
             ? h(
               'div',
               { className: 'mc-empty' },
-              h('p', { className: 'mc-intro' }, t('noMatch', { query: query.trim() })),
+              h(
+                'p',
+                { className: 'mc-intro' },
+                query.trim() === '' ? t('noTypeMatch', { type: typeFilter === 'all' ? t('tabAll') : typeFilter }) : t('noMatch', { query: query.trim() }),
+              ),
               h(
                 'button',
                 { type: 'button', className: 'mc-btn mc-btn-sm', onClick: () => setQuery('') },
