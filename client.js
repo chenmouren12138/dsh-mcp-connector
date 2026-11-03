@@ -485,7 +485,29 @@ window.__ModuleLoader__.load({
       '.mc-field-head{display:flex;align-items:center;justify-content:space-between;gap:12px}',
       '.mc-link-btn{padding:0;font:inherit;font-size:12px;cursor:pointer;color:var(--dsw-alias-link);background:0 0;border:0}',
       '.mc-link-btn:hover{text-decoration:underline}',
-      '.mc-header-row{display:grid;grid-template-columns:1fr 1fr auto auto;gap:6px;align-items:center;margin-top:6px}',
+      '.mc-editor{gap:0;padding:0;overflow:visible}',
+      '.mc-editor .mc-dialog-head{padding:14px 16px 8px}',
+      '.mc-editor .mc-dialog-body{max-height:none;overflow:visible;padding:14px 16px}',
+      '.mc-editor .mc-dialog-foot{padding:12px 16px}',
+      '.mc-select-wrap{position:relative;display:inline-block;width:100%}',
+      '.mc-select-trigger{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;',
+      'height:28px;padding:0 8px;font:inherit;font-size:12.5px;cursor:pointer;',
+      'color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2);',
+      'border:.5px solid var(--dsw-alias-border-l3);border-radius:var(--dsw-radius-sm);text-align:left}',
+      '.mc-select-trigger:hover{background:var(--dsw-alias-bg-layer-3)}',
+      '.mc-select-trigger:focus-visible{outline:var(--dsw-focus-ring-width) solid',
+      'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:2px}',
+      '.mc-select-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.mc-select-caret{color:var(--dsw-alias-label-tertiary);transform:rotate(90deg)}',
+      '.mc-select-caret-open{transform:rotate(270deg)}',
+      '.mc-select-menu{position:absolute;z-index:59;top:calc(100% + 4px);left:0;right:0;margin:0;padding:4px;',
+      'list-style:none;background:var(--dsw-alias-bg-layer-1);border:.5px solid var(--dsw-alias-border-l3);',
+      'border-radius:var(--dsw-radius-md);box-shadow:0 10px 28px rgba(0,0,0,.22);max-height:220px;overflow:auto}',
+      '.mc-select-option{display:flex;align-items:center;justify-content:space-between;gap:8px;',
+      'padding:6px 8px;border-radius:var(--dsw-radius-sm);font-size:12.5px;cursor:pointer;',
+      'color:var(--dsw-alias-label-secondary)}',
+      '.mc-select-option.is-active{background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-primary)}',
+      '.mc-select-option.is-selected{color:var(--dsw-alias-label-primary)}',      '.mc-header-row{display:grid;grid-template-columns:1fr 1fr auto auto;gap:6px;align-items:center;margin-top:6px}',
       '.mc-input-locked{color:var(--dsw-alias-label-tertiary);background:var(--dsw-alias-bg-layer-1)}',
       '.mc-dialog-foot{display:flex;align-items:center;gap:8px;padding:12px 18px;',
       'border-top:.5px solid var(--dsw-alias-border-l2)}',
@@ -984,6 +1006,96 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * A picker drawn with the shell's own vocabulary: bordered trigger plus a menu.
+     * A native <select> renders its option list with OS chrome, which is what made
+     * the transport field look foreign next to DSH controls.
+     */
+    function Select({ label, value, options, onChange }) {
+      const [open, setOpen] = useState(false)
+      const [active, setActive] = useState(0)
+      const wrapRef = useRef(null)
+
+      useEffect(() => {
+        if (!open || typeof document === 'undefined') return undefined
+        const onDoc = (event) => {
+          const node = wrapRef.current
+          if (node && typeof node.contains === 'function' && node.contains(event.target)) return
+          setOpen(false)
+        }
+        document.addEventListener('mousedown', onDoc)
+        return () => document.removeEventListener('mousedown', onDoc)
+      }, [open])
+
+      const current = options.find((option) => option.value === value) ?? options[0]
+
+      const choose = (next) => {
+        onChange(next)
+        setOpen(false)
+      }
+
+      const onKeyDown = (event) => {
+        if (event.key === 'Escape' && open) {
+          event.stopPropagation()
+          setOpen(false)
+          return
+        }
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault()
+          if (!open) {
+            setOpen(true)
+            setActive(Math.max(0, options.findIndex((option) => option.value === value)))
+            return
+          }
+          const delta = event.key === 'ArrowDown' ? 1 : -1
+          setActive((index) => (index + delta + options.length) % options.length)
+          return
+        }
+        if ((event.key === 'Enter' || event.key === ' ') && open) {
+          event.preventDefault()
+          const option = options[active]
+          if (option) choose(option.value)
+        }
+      }
+
+      return h(
+        'div',
+        { className: 'mc-select-wrap', ref: wrapRef, onKeyDown },
+        h(
+          'button',
+          {
+            type: 'button',
+            className: 'mc-select-trigger',
+            'aria-haspopup': 'listbox',
+            'aria-expanded': open ? 'true' : 'false',
+            'aria-label': label,
+            onClick: () => setOpen((state) => !state),
+          },
+          h('span', { className: 'mc-select-value' }, current ? current.label : ''),
+          h(Icon, { name: 'caret', className: open ? 'mc-select-caret mc-select-caret-open' : 'mc-select-caret' }),
+        ),
+        open
+          ? h(
+            'ul',
+            { className: 'mc-select-menu', role: 'listbox', 'aria-label': label },
+            options.map((option, index) => h(
+              'li',
+              {
+                key: option.value,
+                role: 'option',
+                'aria-selected': option.value === value ? 'true' : 'false',
+                className: 'mc-select-option' + (index === active ? ' is-active' : '') + (option.value === value ? ' is-selected' : ''),
+                onMouseEnter: () => setActive(index),
+                onClick: () => choose(option.value),
+              },
+              h('span', null, option.label),
+              option.value === value ? h(Icon, { name: 'check' }) : null,
+            )),
+          )
+          : null,
+      )
+    }
+
+    /**
      * Add / edit dialog: a modal sheet with form and JSON tabs, an editable header
      * row list, and the pre-flight probe next to the save action.
      *
@@ -1139,16 +1251,11 @@ window.__ModuleLoader__.load({
       }, [t])
 
       return h(
-        'div',
-        { className: 'mc-overlay', role: 'presentation' },
-        h(
-          'section',
-          {
-            className: 'mc-dialog',
-            role: 'dialog',
-            'aria-modal': 'true',
-            'aria-label': mode === 'edit' ? t('dialogEdit') : t('dialogAdd'),
-          },
+        'section',
+        {
+          className: 'mc-panel mc-editor',
+          'aria-label': mode === 'edit' ? t('dialogEdit') : t('dialogAdd'),
+        },
           h(
             'header',
             { className: 'mc-dialog-head' },
@@ -1237,22 +1344,17 @@ window.__ModuleLoader__.load({
                   'div',
                   { className: 'mc-field' },
                   h('label', { className: 'mc-label' }, t('fieldTransport')),
-                  h(
-                    'select',
-                    {
-                      className: 'mc-select',
-                      'aria-label': t('fieldTransport'),
-                      value: draft.transport,
-                      onChange: (event) => patch({ transport: event.target.value }),
-                    },
-                    transports.map((transport) => h(
-                      'option',
-                      { key: transport, value: transport },
-                      transport === 'stdio'
+                  h(Select, {
+                    label: t('fieldTransport'),
+                    value: draft.transport,
+                    options: transports.map((transport) => ({
+                      value: transport,
+                      label: transport === 'stdio'
                         ? t('transportStdio')
                         : transport === 'sse' ? t('transportSse') : t('transportHttp'),
-                    )),
-                  ),
+                    })),
+                    onChange: (next) => patch({ transport: next }),
+                  }),
                 ),
                 h(
                   'div',
@@ -1433,7 +1535,6 @@ window.__ModuleLoader__.load({
               busy === 'save' ? t('saving') : mode === 'edit' ? t('actionSave') : t('actionAdd'),
             ),
           ),
-        ),
       )
     }
 

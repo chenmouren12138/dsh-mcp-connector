@@ -467,72 +467,102 @@ await check('添加弹窗：标题、表单/JSON 标签与基础字段', async (
   await flush()
   byText(root, '添加 MCP').props.onClick()
   await flush()
-  const dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
-  assert.ok(dialog, 'dialog rendered')
-  assert.equal(dialog.props.role, 'dialog')
-  assert.equal(dialog.props['aria-modal'], 'true')
+  const dialog = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
+  assert.ok(dialog, 'editor panel rendered')
+  // Inline panel, not a modal: no dialog role and no aria-modal.
+  assert.equal(dialog.props.role, undefined)
+  assert.equal(dialog.props['aria-modal'], undefined)
   assert.match(textOf(dialog), /添加自定义 MCP/)
   assert.ok(byText(dialog, '表单'), 'form tab')
   assert.ok(byText(dialog, 'JSON'), 'json tab')
   assert.ok(byLabel(dialog, '服务器名（工具命名空间）'), 'name field')
-  assert.ok(byLabel(dialog, '传输类型'), 'transport field')
+  assert.ok(byAria(dialog, '传输类型'), 'transport picker')
   assert.ok(byLabel(dialog, '超时时间（毫秒，可选）'), 'timeout field')
   assert.ok(byLabel(dialog, '命令'), 'stdio command field')
   assert.ok(byText(dialog, '添加 MCP'), 'primary action')
   assert.ok(byText(dialog, '取消'), 'cancel action')
 })
 
+await check('传输类型是自绘下拉，选择后收起并切换字段', async () => {
+  const panel = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
+  const trigger = byAria(panel, '传输类型')
+  assert.ok(trigger, 'picker trigger')
+  assert.equal(trigger.props['aria-expanded'], 'false')
+  trigger.props.onClick()
+  rerender()
+  const menu = findAll(root, (node) => node.props?.['role'] === 'listbox')[0]
+  assert.ok(menu, 'listbox open')
+  const options = findAll(menu, (node) => node.props?.['role'] === 'option')
+  assert.ok(options.length >= 2, 'options listed')
+  assert.ok(options.every((option) => option.type === 'li'), 'options are list items, not native <option>')
+  options.find((option) => textOf(option).includes('Streamable HTTP')).props.onClick()
+  rerender()
+  assert.equal(findAll(root, (node) => node.props?.['role'] === 'listbox').length, 0, 'menu closes after choosing')
+  const after = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
+  assert.match(textOf(after), /服务地址/, 'HTTP fields appear')
+})
+
 await check('草稿测试连接返回结构化失败', async () => {
-  let dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  let dialog = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
+  // The previous case switched the draft to HTTP; go back to stdio.
+  if (!findAll(dialog, (node) => node.type === 'input' && node.props?.['aria-label'] === '命令').length) {
+    byAria(dialog, '传输类型').props.onClick()
+    rerender()
+    byText(findAll(root, (node) => node.props?.['role'] === 'listbox')[0], 'stdio（本地子进程）').props.onClick()
+    rerender()
+    dialog = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
+  }
   byLabel(dialog, '服务器名（工具命名空间）').props.onChange({ target: { value: 'probe' } })
   byLabel(dialog, '命令').props.onChange({ target: { value: 'nope' } })
   rerender()
-  dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  dialog = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
   byText(dialog, '测试连接').props.onClick()
   await flush()
-  const text = textOf(findAll(root, (node) => node.props?.className === 'mc-dialog')[0])
+  const text = textOf(findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0])
   assert.match(text, /连接失败/)
   assert.match(text, /COMMAND_NOT_FOUND/)
   assert.match(text, /config/)
 })
 
 await check('请求头行：新增、默认隐藏、可显示、可删除', async () => {
-  let dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
-  byLabel(dialog, '传输类型').props.onChange({ target: { value: 'streamable-http' } })
+  let dialog = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
+  byAria(dialog, '传输类型').props.onClick()
   rerender()
-  dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  byText(findAll(root, (node) => node.props?.['role'] === 'listbox')[0], 'Streamable HTTP').props.onClick()
+  rerender()
+  dialog = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
   byLabel(dialog, '服务地址').props.onChange({ target: { value: 'https://example.com/mcp' } })
   rerender()
-  dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  dialog = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
   // No long hint and no credential affordance on the rows.
   assert.ok(!textOf(dialog).includes('存为凭据'), 'credential action removed')
   assert.ok(!textOf(dialog).includes('还没有请求头'), 'empty-state hint removed')
 
   byText(dialog, '+ 添加 Header').props.onClick()
   rerender()
-  dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  dialog = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
   const nameInput = findAll(dialog, (node) => node.type === 'input' && node.props?.['aria-label'] === 'Header 名称')[0]
   assert.ok(nameInput, 'header name input')
 
   nameInput.props.onChange({ target: { value: 'modao-token' } })
   rerender()
-  dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  dialog = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
   let valueInput = findAll(dialog, (node) => node.type === 'input' && node.props?.['aria-label'] === '值')[0]
   assert.equal(valueInput.props.type, 'password', 'value hidden by default')
   valueInput.props.onChange({ target: { value: 'sekret-token' } })
   rerender()
 
-  dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  dialog = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
   byAria(dialog, '显示值').props.onClick()
   rerender()
-  dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  dialog = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
   valueInput = findAll(dialog, (node) => node.type === 'input' && node.props?.['aria-label'] === '值')[0]
   assert.equal(valueInput.props.type, 'text', 'eye reveals the full value')
   assert.equal(valueInput.props.value, 'sekret-token')
 
   byAria(dialog, '隐藏值').props.onClick()
   rerender()
-  dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  dialog = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
   assert.equal(findAll(dialog, (node) => node.type === 'input' && node.props?.['aria-label'] === '值')[0].props.type, 'password')
 
   byAria(dialog, '删除该请求头').props.onClick()
@@ -540,19 +570,19 @@ await check('请求头行：新增、默认隐藏、可显示、可删除', asyn
 })
 
 await check('JSON 标签：合法内容回写表单，非法给出提示', async () => {
-  let dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  let dialog = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
   byText(dialog, 'JSON').props.onClick()
   rerender()
-  dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  dialog = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
   const area = findAll(dialog, (node) => node.type === 'textarea' && node.props?.['aria-label'] === 'JSON')[0]
   assert.ok(area, 'json textarea')
   area.props.onChange({
     target: { value: JSON.stringify({ mymcp: { transport: 'stdio', command: 'node', args: ['x'] } }, null, 2) },
   })
   rerender()
-  byText(findAll(root, (node) => node.props?.className === 'mc-dialog')[0], '表单').props.onClick()
+  byText(findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0], '表单').props.onClick()
   rerender()
-  dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  dialog = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
   const nameField = findAll(dialog, (node) => node.type === 'input' && node.props?.['aria-label'] === '服务器名（工具命名空间）')[0]
   assert.equal(nameField.props.value, 'mymcp')
   assert.equal(findAll(dialog, (node) => node.type === 'input' && node.props?.['aria-label'] === '命令')[0].props.value, 'node')
@@ -562,9 +592,9 @@ await check('JSON 标签：合法内容回写表单，非法给出提示', async
   findAll(root, (node) => node.type === 'textarea' && node.props?.['aria-label'] === 'JSON')[0]
     .props.onChange({ target: { value: '{oops' } })
   rerender()
-  assert.match(textOf(findAll(root, (node) => node.props?.className === 'mc-dialog')[0]), /JSON 不合法/)
+  assert.match(textOf(findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]), /JSON 不合法/)
   // Invalid JSON keeps the tab open on purpose; close the sheet for the next case.
-  byText(findAll(root, (node) => node.props?.className === 'mc-dialog')[0], '取消').props.onClick()
+  byText(findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0], '取消').props.onClick()
   await flush()
 })
 
@@ -575,11 +605,11 @@ await check('添加 MCP 调用 addServer 并展示挂载回执', async () => {
   await flush()
   byText(root, '添加 MCP').props.onClick()
   await flush()
-  let dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  let dialog = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
   byLabel(dialog, '服务器名（工具命名空间）').props.onChange({ target: { value: 'probe' } })
   byLabel(dialog, '命令').props.onChange({ target: { value: 'node' } })
   rerender()
-  byText(findAll(root, (node) => node.props?.className === 'mc-dialog')[0], '添加 MCP').props.onClick()
+  byText(findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0], '添加 MCP').props.onClick()
   await flush()
   const call = calls.filter((item) => item.action === 'addServer').at(-1)
   assert.ok(call, 'addServer called')
@@ -655,7 +685,7 @@ await check('编辑弹窗与添加弹窗同构：标题、名称锁定、动作�
   const list = findAll(root, (node) => node.props?.className === 'mc-list')[0]
   byText(list, '编辑').props.onClick()
   await flush()
-  const dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  const dialog = findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
   assert.ok(dialog, 'edit dialog')
   assert.equal(dialog.props['aria-label'], '编辑自定义 MCP')
   const text = textOf(dialog)
