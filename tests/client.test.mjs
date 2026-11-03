@@ -645,6 +645,20 @@ await check('只有列表滚动：标题与工具栏保持原样，不加背景'
   assert.equal(findAll(root, (node) => node.props?.className === 'mc-sticky').length, 0, 'no painted sticky block')
 })
 
+await check('名称不再受 [a-z0-9_-] 限制：中文名可用，前缀自动转换', async () => {
+  root = mount()
+  await flush()
+  byText(root, '添加 MCP').props.onClick()
+  await flush()
+  const panel = () => findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
+  const nameInput = () => findAll(panel(), (node) => node.type === 'input' && node.props?.['aria-label'] === '服务器名（工具命名空间）')[0]
+
+  nameInput().props.onChange({ target: { value: '墨刀 原型' } })
+  rerender()
+  assert.match(textOf(panel()), /工具名前缀将是「mcp」/, 'the derived prefix is previewed')
+  assert.equal(nameInput().props.value, '墨刀 原型', 'the field keeps the friendly name')
+})
+
 await check('类型标签：按产品类型筛选、数量、默认全部', async () => {
   root = mount()
   await flush()

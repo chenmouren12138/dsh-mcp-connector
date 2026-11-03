@@ -369,7 +369,7 @@ try {
     for (const name of ['imp1', 'imp2', 'imp3', 'imp4', 'imp5']) assert.ok(names.includes(name), name)
   })
 
-  await check('导入校验失败时逐条报错且不写入', async () => {
+  await check('导入：友好名字自动转成前缀，缺 command 仍逐条报错', async () => {
     const before = runtime.snapshot().servers.length
     const result = await runtime.importJson({
       text: JSON.stringify({
@@ -382,9 +382,9 @@ try {
     })
     assert.equal(result.ok, false)
     assert.equal(result.written, false)
-    assert.equal(result.rejected.length, 2)
-    assert.equal(result.accepted.length, 1)
-    assert.ok(result.rejected.some((item) => item.code === 'SERVER_NAME_INVALID'))
+    assert.equal(result.rejected.length, 1, "only the missing command is rejected")
+    assert.equal(result.accepted.length, 2, "the friendly name is accepted")
+    assert.ok(result.rejected.some((item) => item.code === 'CONFIG_INVALID'), 'codes: ' + JSON.stringify(result.rejected.map((item) => item.code)))
     assert.equal(runtime.snapshot().servers.length, before)
   })
 

@@ -143,7 +143,8 @@ window.__ModuleLoader__.load({
       headerReveal: '显示值',
       headerHide: '隐藏值',
       fieldName: '服务器名（工具命名空间）',
-      fieldNameHint: '匹配 [A-Za-z0-9_-]{1,32}；改名会按新前缀重新注册工具。',
+      fieldNameHint: '名称不限格式；工具前缀只用 [a-z0-9_-]。改名会按新前缀重新注册工具。',
+      nameDerived: '工具名前缀将是「{name}」，卡片仍显示你输入的名称。',
       fieldTransport: '传输类型',
       fieldCommand: '命令',
       fieldCommandHint: '可执行文件名或绝对路径，例如 npx、node、python。',
@@ -268,7 +269,8 @@ window.__ModuleLoader__.load({
       headerReveal: 'Show value',
       headerHide: 'Hide value',
       fieldName: 'Server name (tool namespace)',
-      fieldNameHint: 'Matches [A-Za-z0-9_-]{1,32}; renaming re-registers its tools under the new prefix.',
+      fieldNameHint: 'Any name works; the tool prefix keeps [a-z0-9_-] only. Renaming re-registers its tools.',
+      nameDerived: 'The tool prefix will be “{name}”; the card keeps the name you typed.',
       fieldTransport: 'Transport',
       fieldCommand: 'Command',
       fieldCommandHint: 'Executable name or absolute path, e.g. npx, node, python.',
@@ -1079,6 +1081,17 @@ window.__ModuleLoader__.load({
       { key: 'browse', words: ['browser', 'playwright', 'puppeteer', 'chrome', 'selenium', '浏览器'] },
     ]
 
+    /** Same rule the host applies: friendly label → portable tool prefix. */
+    function slugName(label) {
+      const slug = String(label ?? '')
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 32)
+      return slug === '' ? 'mcp' : slug
+    }
+
     /** Guess a product category from the name, the endpoint and the tool names. */
     function inferCategory(server) {
       const haystack = [
@@ -1164,7 +1177,7 @@ window.__ModuleLoader__.load({
     function validateFields(draft, t) {
       const name = String(draft.serverName ?? '').trim()
       return {
-        serverName: /^[A-Za-z0-9_-]{1,32}$/.test(name) ? '' : t('requiredName'),
+        serverName: name.trim() === '' ? t('requiredName') : '',
         command: draft.transport === 'stdio' && String(draft.command ?? '').trim() === '' ? t('requiredCommand') : '',
         url: draft.transport !== 'stdio' && String(draft.url ?? '').trim() === '' ? t('requiredUrl') : '',
         timeoutMs: draft.timeoutMs !== '' && draft.timeoutMs !== undefined && Number(draft.timeoutMs) < 1000 ? t('timeoutError') : '',
@@ -1314,7 +1327,7 @@ window.__ModuleLoader__.load({
 
     function validateDraft(draft, t) {
       const errors = []
-      if (!/^[A-Za-z0-9_-]{1,32}$/.test(draft.serverName.trim())) errors.push(t('requiredName'))
+      if (draft.serverName.trim() === '') errors.push(t('requiredName'))
       if (draft.transport === 'stdio' && draft.command.trim() === '') errors.push(t('requiredCommand'))
       if (draft.transport !== 'stdio' && draft.url.trim() === '') errors.push(t('requiredUrl'))
       return errors
@@ -1768,7 +1781,12 @@ window.__ModuleLoader__.load({
                   }),
                   shown.serverName
                     ? h('p', { className: 'mc-hint mc-err' }, shown.serverName)
-                    : h('p', { className: 'mc-hint' }, mode === 'edit' && server ? t('agentNameHint', { name: server.serverName }) : t('fieldNameHint')),
+                    : (() => {
+                      const typed = String(draft.serverName ?? '').trim()
+                      const derived = typed !== '' && !/^[A-Za-z0-9_-]{1,32}$/.test(typed) ? slugName(typed) : ''
+                      if (derived) return h('p', { className: 'mc-hint' }, t('nameDerived', { name: derived }))
+                      return h('p', { className: 'mc-hint' }, mode === 'edit' && server ? t('agentNameHint', { name: server.serverName }) : t('fieldNameHint'))
+                    })(),
                 ),
                 h(
                   'div',
@@ -2101,7 +2119,7 @@ window.__ModuleLoader__.load({
           className: 'mc-item',
           'data-tone': toneOf(server.state),
           'data-open': open ? 'true' : undefined,
-          'data-search': String(server.serverName ?? '').toLowerCase(),
+          'data-search': `${server.displayName ?? ''} ${server.serverName ?? ''}`.toLowerCase(),
         },
         h(
           'div',
@@ -2115,7 +2133,7 @@ window.__ModuleLoader__.load({
               onClick: () => setOpen((value) => !value),
             },
             h(Icon, { name: 'caret', className: open ? 'mc-icon-open' : undefined }),
-            h('span', { className: 'mc-name' }, server.serverName),
+            h('span', { className: 'mc-name' }, server.displayName ?? server.serverName),
           ),
           h(StateBadge, { state: server.state, label: server.stateLabel }),
           server.toolCount > 0
@@ -2602,7 +2620,7 @@ window.__ModuleLoader__.load({
       const matchesType = (server) => typeFilter === 'all' || categoryOf(server) === typeFilter
       const visible = (needle === ''
         ? servers.filter(matchesType)
-        : servers.filter(matchesType).filter((server) => String(server.serverName ?? '').toLowerCase().includes(needle))
+        : servers.filter(matchesType).filter((server) => `${server.displayName ?? ''} ${server.serverName ?? ''}`.toLowerCase().includes(needle))
       ).sort(newestFirst)
 
       return h(

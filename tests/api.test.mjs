@@ -169,12 +169,12 @@ await check('非法 JSON 请求体 400', async () => {
 await check('导入校验失败返回逐条原因而非写入', async () => {
   const res = await callRoute('api', 'POST', {
     action: 'importJson',
-    payload: { text: JSON.stringify({ mcpServers: { 'bad name!': { command: 'x' } } }) },
+    payload: { text: JSON.stringify({ mcpServers: { 'no command here': { args: ['x'] } } }) },
   })
   assert.equal(res.record.status, 200)
   assert.equal(res.json.ok, false)
   assert.equal(res.json.error.detail.written, false)
-  assert.equal(res.json.error.detail.rejected[0].code, 'SERVER_NAME_INVALID')
+  assert.equal(res.json.error.detail.rejected[0].code, 'CONFIG_INVALID')
   const snapshot = await callRoute('api', 'GET')
   assert.equal(snapshot.json.data.servers.length, 1)
 })
