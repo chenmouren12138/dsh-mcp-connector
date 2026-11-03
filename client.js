@@ -409,8 +409,6 @@ window.__ModuleLoader__.load({
       '.mc-act-edit{color:var(--dsw-alias-label-secondary)}',
       '.mc-act-power[data-tone="on"]{color:var(--dsw-alias-state-success-primary,var(--dsw-alias-state-business-primary))}',
       '.mc-act-danger{color:var(--dsw-alias-state-error-primary)}',
-      '.mc-act-shield{color:var(--dsw-alias-state-business-primary)}',
-      '.mc-act-shield-on{color:var(--dsw-alias-state-success-primary,var(--dsw-alias-state-business-primary))}',
       '.mc-oauth-ok{color:var(--dsw-alias-state-success-primary,var(--dsw-alias-state-business-primary))}',
       '.mc-tip-wrap{position:relative;display:inline-flex;flex:none}',
       '.mc-tip{position:absolute;left:50%;bottom:calc(100% + 6px);z-index:70;',
@@ -657,8 +655,6 @@ window.__ModuleLoader__.load({
       plug: 'M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0V8ZM12 17v4',
       power: 'M12 3v9M6.6 6.6a8 8 0 1 0 11 0',
       pencil: 'M4 20h4L19 9l-4-4L4 16v4Zm10-14 4 4',
-      shield: 'M12 3l7 3v6c0 4.2-2.9 7.6-7 9-4.1-1.4-7-4.8-7-9V6l7-3Zm-2.5 9l2 2 4-4',
-      shieldOff: 'M12 3l7 3v6c0 4.2-2.9 7.6-7 9-4.1-1.4-7-4.8-7-9V6l7-3ZM4 4l16 16',
       eyeOff: 'M3 3l18 18M10.6 6.1A10.6 10.6 0 0 1 12 6c6.4 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7.4A17.4 17.4 0 0 0 2 12s3.6 6 10 6a10.4 10.4 0 0 0 4-.8',
     }
 
