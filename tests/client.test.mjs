@@ -127,6 +127,11 @@ function byPlaceholder(tree, placeholder) {
   return findAll(tree, (node) => node.props?.placeholder === placeholder)[0]
 }
 
+/** Find an operable node by its accessibility label (icon buttons have no text). */
+function byAria(tree, label) {
+  return findAll(tree, (node) => node.props?.['aria-label'] === label && typeof node.props?.onClick === 'function')[0]
+}
+
 function byLabel(tree, label) {
   // Field() renders <label class="mc-label">…</label> followed by the control.
   const fields = findAll(tree, (node) => node.props?.className === 'mc-field' || node.props?.className === 'mc-field mc-field-full')
@@ -452,7 +457,7 @@ await check('列表展示状态徽标、最近成功与错误摘要', async () =
 await check('添加弹窗：标题、表单/JSON 标签与基础字段', async () => {
   root = mount()
   await flush()
-  byText(root, '添加服务器').props.onClick()
+  byText(root, '添加 MCP').props.onClick()
   await flush()
   const dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
   assert.ok(dialog, 'dialog rendered')
@@ -509,7 +514,7 @@ await check('请求头行：新增、存为凭据、删除', async () => {
   rerender()
 
   dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
-  byText(dialog, '🔑').props.onClick()
+  byAria(dialog, '存为凭据').props.onClick()
   await flush()
   const call = calls.filter((item) => item.action === 'setCredential').at(-1)
   assert.ok(call, 'setCredential called')
@@ -521,7 +526,7 @@ await check('请求头行：新增、存为凭据、删除', async () => {
   assert.ok(locked, 'bound row shows a masked value')
   assert.match(String(locked.props.value), /••••/)
 
-  byText(dialog, '🗑').props.onClick()
+  byAria(dialog, '删除该请求头').props.onClick()
   rerender()
   assert.match(textOf(findAll(root, (node) => node.props?.className === 'mc-dialog')[0]), /还没有请求头/)
 })
@@ -560,7 +565,7 @@ await check('添加 MCP 调用 addServer 并展示挂载回执', async () => {
   // at the same path would otherwise inherit the previous tab and draft.
   root = mount()
   await flush()
-  byText(root, '添加服务器').props.onClick()
+  byText(root, '添加 MCP').props.onClick()
   await flush()
   let dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
   byLabel(dialog, '服务器名（工具命名空间）').props.onChange({ target: { value: 'probe' } })
@@ -577,18 +582,28 @@ await check('添加 MCP 调用 addServer 并展示挂载回执', async () => {
 await check('列表行动作：禁用 / 重试 / 测试 / 删除二次确认', async () => {
   root = mount()
   await flush()
+
+  // Row surface: test + edit stay visible; the rest lives behind the overflow menu.
+  assert.ok(byText(root, '测试连接'), 'test stays visible')
+  assert.ok(byText(root, '编辑'), 'edit stays visible')
+  assert.equal(byText(root, '禁用'), undefined, 'destructive actions are collapsed')
+
+  byAria(root, '更多操作').props.onClick()
+  rerender()
   const disable = byText(root, '禁用')
-  assert.ok(disable, 'disable button')
+  assert.ok(disable, 'disable inside overflow menu')
   disable.props.onClick()
   await flush()
   assert.ok(calls.some((item) => item.action === 'setDisabled' && item.payload.disabled === true))
 
-  const test = byText(root, '测试连接')
+  const test = byText(findAll(root, (node) => node.props?.className === 'mc-list')[0], '测试连接')
   test.props.onClick()
   await flush()
   assert.ok(calls.some((item) => item.action === 'testConnection' && item.payload.id === 'srv-new'))
   assert.match(textOf(root), /连接有效|2025-06-18/)
 
+  // The overflow menu stays open through an action, so the delete entry is still
+  // reachable without reopening it.
   const remove = byText(root, '删除')
   remove.props.onClick()
   await flush()
@@ -598,6 +613,28 @@ await check('列表行动作：禁用 / 重试 / 测试 / 删除二次确认', a
   await flush()
   assert.ok(calls.some((item) => item.action === 'removeServer'))
   assert.match(textOf(root), /已删除/)
+})
+
+await check('搜索过滤与无结果态，图标为矢量而非 emoji', async () => {
+  root = mount()
+  await flush()
+  assert.ok(findAll(root, (node) => node.type === 'svg').length > 0, 'vector icons rendered')
+  assert.ok(!textOf(root).includes('🔑'), 'no emoji as structural icon')
+
+  const search = findAll(root, (node) => node.props?.['aria-label'] === '搜索服务器')[0]
+  assert.ok(search, 'search input')
+  search.props.onChange({ target: { value: 'probe' } })
+  rerender()
+  const list = findAll(root, (node) => node.props?.className === 'mc-list')[0]
+  assert.match(textOf(list), /probe/)
+  assert.ok(!textOf(list).includes('broken'), 'non-matching row hidden')
+
+  search.props.onChange({ target: { value: 'nothing-matches' } })
+  rerender()
+  assert.match(textOf(root), /没有匹配/)
+  byText(root, '清除搜索').props.onClick()
+  rerender()
+  assert.equal(findAll(root, (node) => node.props?.['aria-label'] === '搜索服务器')[0].props.value, '')
 })
 
 await check('导入面板：逐条校验失败原样展示', async () => {

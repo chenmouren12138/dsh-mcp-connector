@@ -39,6 +39,14 @@ window.__ModuleLoader__.load({
       registryOff: '运行时注册表已关闭',
       add: '添加服务器',
       refresh: '刷新',
+      search: '搜索服务器',
+      searchPlaceholder: '搜索名称、地址或工具…',
+      clearSearch: '清除搜索',
+      noMatch: '没有匹配「{query}」的服务器',
+      moreActions: '更多操作',
+      copyTools: '复制工具名',
+      copyConfig: '复制配置',
+      copyDiagnostic: '复制诊断',
       import: '导入 JSON',
       export: '导出 JSON',
       empty: '还没有 MCP 服务器。添加一台，或从 Claude Desktop / VS Code 的配置导入。',
@@ -95,6 +103,7 @@ window.__ModuleLoader__.load({
       actionSave: '保存 MCP',
       fieldTimeout: '超时时间（毫秒，可选）',
       fieldTimeoutHint: '单次工具调用的最长等待时间，最小 1000 毫秒；留空用默认策略。',
+      timeoutError: '超时时间至少 1000 毫秒，或留空使用默认。',
       namePlaceholder: '例如 github-search',
       urlPlaceholder: 'https://example.com/mcp',
       headerAdd: '+ 添加 Header',
@@ -198,6 +207,14 @@ window.__ModuleLoader__.load({
       registryOff: 'Runtime registry off',
       add: 'Add server',
       refresh: 'Refresh',
+      search: 'Search servers',
+      searchPlaceholder: 'Search name, endpoint or tool…',
+      clearSearch: 'Clear search',
+      noMatch: 'No server matches “{query}”',
+      moreActions: 'More actions',
+      copyTools: 'Copy tool names',
+      copyConfig: 'Copy config',
+      copyDiagnostic: 'Copy diagnostic',
       import: 'Import JSON',
       export: 'Export JSON',
       empty: 'No MCP servers yet. Add one, or import a Claude Desktop / VS Code config.',
@@ -254,6 +271,7 @@ window.__ModuleLoader__.load({
       actionSave: 'Save MCP',
       fieldTimeout: 'Timeout (ms, optional)',
       fieldTimeoutHint: 'Longest wait for one tool call, at least 1000 ms; leave blank for the default policy.',
+      timeoutError: 'Use at least 1000 ms, or leave it blank for the default.',
       namePlaceholder: 'e.g. github-search',
       urlPlaceholder: 'https://example.com/mcp',
       headerAdd: '+ Add header',
@@ -472,8 +490,46 @@ window.__ModuleLoader__.load({
       '.mc-input-locked{color:var(--dsw-alias-label-tertiary);background:var(--dsw-alias-bg-layer-1)}',
       '.mc-dialog-foot{display:flex;align-items:center;gap:8px;padding:12px 18px;',
       'border-top:.5px solid var(--dsw-alias-border-l2)}',
-      '@media (max-width:560px){.mc-grid{grid-template-columns:1fr}}',
-      '@media (prefers-reduced-motion:reduce){.mc-dot{animation:none}}',
+      // Icons, search, row disclosure, skeleton.
+      '.mc-icon{display:block;flex:none}',
+      '.mc-icon-open{transform:rotate(90deg)}',
+      '.mc-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px}',
+      '.mc-btn-icon{width:30px;padding:0}',
+      '.mc-icon-btn{width:28px;height:28px}',
+      '.mc-search{position:relative;display:flex;align-items:center;flex:1 1 220px;max-width:340px;min-width:0}',
+      '.mc-search-icon{position:absolute;left:8px;color:var(--dsw-alias-label-tertiary);pointer-events:none}',
+      '.mc-search-input{padding-left:28px;padding-right:28px}',
+      '.mc-search-clear{position:absolute;right:1px}',
+      '.mc-item-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
+      '.mc-disclosure{display:inline-flex;align-items:center;gap:6px;padding:0;font:inherit;',
+      'color:inherit;background:0 0;border:0;cursor:pointer;text-align:left}',
+      '.mc-disclosure:focus-visible{outline:var(--dsw-focus-ring-width) solid',
+      'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:2px;border-radius:4px}',
+      '.mc-chip{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:999px;',
+      'font-size:11.5px;background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-secondary)}',
+      '.mc-spacer{flex:1 1 auto}',
+      '.mc-more{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;border-radius:var(--dsw-radius-sm);',
+      'background:var(--dsw-alias-bg-layer-2)}',
+      '.mc-details{display:flex;flex-direction:column;gap:10px;padding:10px 12px;',
+      'border:.5px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm);',
+      'background:var(--dsw-alias-bg-layer-1)}',
+      '.mc-pre{margin:0;max-height:220px;overflow:auto;padding:8px 10px;',
+      'border-radius:var(--dsw-radius-sm);background:var(--dsw-alias-bg-base);',
+      'font:12px/17px ui-monospace,SFMono-Regular,monospace;color:var(--dsw-alias-label-secondary)}',
+      '.mc-skeleton{display:flex;flex-direction:column;gap:8px;padding:14px 2px;',
+      'border-bottom:.5px solid var(--dsw-alias-border-l2)}',
+      '.mc-skel-line{display:block;height:10px;border-radius:6px;',
+      'background:linear-gradient(90deg,var(--dsw-alias-bg-layer-2),var(--dsw-alias-bg-layer-3),var(--dsw-alias-bg-layer-2));',
+      'background-size:200% 100%;animation:mc-shimmer 1.4s ease-in-out infinite}',
+      '.mc-skel-title{width:32%;height:14px}',
+      '.mc-skel-meta{width:68%}',
+      '.mc-skel-short{width:44%}',
+      '@keyframes mc-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}',
+      '@media (max-width:560px){.mc-grid{grid-template-columns:1fr}',
+      '.mc-search{flex-basis:100%;max-width:none}',
+      '.mc-header-row{grid-template-columns:1fr auto auto}',
+      '.mc-header-row .mc-input:first-child{grid-column:1 / -1}}',
+      '@media (prefers-reduced-motion:reduce){.mc-dot{animation:none}.mc-skel-line{animation:none}}',
     ].join('')
 
     function installStyles() {
@@ -713,6 +769,49 @@ window.__ModuleLoader__.load({
 
     // ── small presentational pieces ───────────────────────────────────────────
 
+    /**
+     * Inline vector icons (Phosphor geometry, 16px box, currentColor stroke).
+     *
+     * No emoji as structural icons: they inherit platform emoji fonts, break the
+     * stroke/weight rhythm of the shell, and read inconsistently to screen readers.
+     */
+    const ICON_PATHS = {
+      plus: 'M12 5v14M5 12h14',
+      close: 'M6 6l12 12M18 6L6 18',
+      search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm5.2-.8L21 21',
+      key: 'M14 7a4 4 0 1 1-3.1 6.5L8 16.4V19H5v-3l4.6-4.6A4 4 0 0 1 14 7Zm1 2h.01',
+      trash: 'M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13M10 11v6M14 11v6',
+      retry: 'M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5',
+      caret: 'M9 6l6 6-6 6',
+      more: 'M6 12h.01M12 12h.01M18 12h.01',
+      copy: 'M9 9h9v11H9zM6 15H4V4h11v2',
+      check: 'M5 13l4 4L19 7',
+      reload: 'M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5',
+      warning: 'M12 4l9 16H3L12 4Zm0 6v5m0 3h.01',
+    }
+
+    function Icon({ name, size = 16, className, title }) {
+      return h(
+        'svg',
+        {
+          className: className ? `mc-icon ${className}` : 'mc-icon',
+          width: size,
+          height: size,
+          viewBox: '0 0 24 24',
+          fill: 'none',
+          stroke: 'currentColor',
+          'stroke-width': '1.8',
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          'aria-hidden': title ? undefined : 'true',
+          role: title ? 'img' : undefined,
+          focusable: 'false',
+        },
+        title ? h('title', null, title) : null,
+        h('path', { d: ICON_PATHS[name] ?? ICON_PATHS.more }),
+      )
+    }
+
     function StateBadge({ state, label }) {
       return h(
         'span',
@@ -944,6 +1043,15 @@ window.__ModuleLoader__.load({
 
       const transports = allowedTransports.length > 0 ? allowedTransports : ['stdio', 'streamable-http']
 
+      // Field-level validation, rendered inline under each control. Save and probe
+      // share it so the two paths can never disagree about what is valid.
+      const fieldErrors = {
+        serverName: /^[A-Za-z0-9_-]{1,32}$/.test(draft.serverName.trim()) ? '' : t('requiredName'),
+        command: draft.transport === 'stdio' && draft.command.trim() === '' ? t('requiredCommand') : '',
+        url: draft.transport !== 'stdio' && draft.url.trim() === '' ? t('requiredUrl') : '',
+        timeoutMs: draft.timeoutMs !== '' && Number(draft.timeoutMs) < 1000 ? t('timeoutError') : '',
+      }
+      const firstFieldError = Object.values(fieldErrors).find(Boolean) ?? ''
       const buildPayload = useCallback(() => ({
         serverName: draft.serverName.trim(),
         disabled: draft.disabled,
@@ -951,9 +1059,8 @@ window.__ModuleLoader__.load({
       }), [draft])
 
       const runProbe = useCallback(async () => {
-        const problems = validateDraft(draft, t)
-        if (problems.length > 0) {
-          setErrors(problems)
+        if (firstFieldError !== '') {
+          setErrors([firstFieldError])
           return
         }
         setErrors([])
@@ -978,9 +1085,8 @@ window.__ModuleLoader__.load({
       }, [buildPayload, draft, t])
 
       const save = useCallback(async () => {
-        const problems = validateDraft(draft, t)
-        if (problems.length > 0) {
-          setErrors(problems)
+        if (firstFieldError !== '') {
+          setErrors([firstFieldError])
           return
         }
         setErrors([])
@@ -1083,7 +1189,7 @@ window.__ModuleLoader__.load({
             h(
               'button',
               { type: 'button', className: 'mc-icon-btn', 'aria-label': t('dialogClose'), onClick: onCancel },
-              '✕',
+              h(Icon, { name: 'close' }),
             ),
           ),
           h(
@@ -1151,7 +1257,7 @@ window.__ModuleLoader__.load({
                     autoComplete: 'off',
                     onChange: (event) => patch({ serverName: event.target.value }),
                   }),
-                  h('p', { className: 'mc-hint' }, t('fieldNameHint')),
+                  fieldErrors.serverName ? h('p', { className: 'mc-hint mc-err' }, fieldErrors.serverName) : h('p', { className: 'mc-hint' }, t('fieldNameHint')),
                 ),
                 h(
                   'div',
@@ -1186,7 +1292,7 @@ window.__ModuleLoader__.load({
                     value: draft.timeoutMs,
                     onChange: (event) => patch({ timeoutMs: event.target.value.replace(/[^\d]/g, '') }),
                   }),
-                  h('p', { className: 'mc-hint' }, t('fieldTimeoutHint')),
+                  fieldErrors.timeoutMs ? h('p', { className: 'mc-hint mc-err' }, fieldErrors.timeoutMs) : h('p', { className: 'mc-hint' }, t('fieldTimeoutHint')),
                 ),
                 draft.transport !== 'stdio'
                   ? h(
@@ -1202,7 +1308,7 @@ window.__ModuleLoader__.load({
                       autoComplete: 'off',
                       onChange: (event) => patch({ url: event.target.value }),
                     }),
-                    h('p', { className: 'mc-hint' }, t('fieldUrlHint')),
+                    fieldErrors.url ? h('p', { className: 'mc-hint mc-err' }, fieldErrors.url) : h('p', { className: 'mc-hint' }, t('fieldUrlHint')),
                   )
                   : [
                     h(
@@ -1217,7 +1323,7 @@ window.__ModuleLoader__.load({
                         autoComplete: 'off',
                         onChange: (event) => patch({ command: event.target.value }),
                       }),
-                      h('p', { className: 'mc-hint' }, t('fieldCommandHint')),
+                      fieldErrors.command ? h('p', { className: 'mc-hint mc-err' }, fieldErrors.command) : h('p', { className: 'mc-hint' }, t('fieldCommandHint')),
                     ),
                     h(
                       'div',
@@ -1328,7 +1434,7 @@ window.__ModuleLoader__.load({
                                 commitRows(next)
                               },
                             },
-                            '↻',
+                            h(Icon, { name: 'retry' }),
                           )
                           : h(
                             'button',
@@ -1340,7 +1446,7 @@ window.__ModuleLoader__.load({
                               disabled: credBusy === String(index),
                               onClick: () => bindCredential(index),
                             },
-                            '🔑',
+                            h(Icon, { name: 'key' }),
                           ),
                         h(
                           'button',
@@ -1351,7 +1457,7 @@ window.__ModuleLoader__.load({
                             title: t('headerRemove'),
                             onClick: () => commitRows(rows.filter((_item, i) => i !== index)),
                           },
-                          '🗑',
+                          h(Icon, { name: 'trash' }),
                         ),
                       )),
                     h('p', { className: 'mc-hint' }, t('fieldHeadersHint')),
@@ -1465,24 +1571,92 @@ window.__ModuleLoader__.load({
 
     // ── one registry row ──────────────────────────────────────────────────────
 
+    /**
+     * One server row.
+     *
+     * Split by frequency of use: the two actions people run constantly (test,
+     * edit) stay visible, the rest live behind a disclosure so six buttons do not
+     * compete for attention. The row name itself is the details disclosure, so the
+     * whole left side is one large target instead of a tiny chevron.
+     */
     function ServerItem({ server, t, locale, busy, onAction, credentialRefs }) {
       const [open, setOpen] = useState(false)
+      const [more, setMore] = useState(false)
       const [confirming, setConfirming] = useState(false)
+      const [copied, setCopied] = useState('')
       const lastSuccess = formatTime(server.lastSuccessAt, locale)
       const error = server.lastError
       const endpoint = server.config.transport === 'stdio'
         ? [server.config.command, ...(server.config.args ?? [])].join(' ')
         : server.config.url
 
+      const copy = useCallback(async (text, kind) => {
+        try {
+          await navigator.clipboard.writeText(text)
+          setCopied(kind)
+          setTimeout(() => setCopied(''), 1500)
+        } catch {
+          // Clipboard may be blocked; the text stays selectable.
+        }
+      }, [])
+
       return h(
         'li',
-        { className: 'mc-item', 'data-tone': toneOf(server.state) },
+        { className: 'mc-item', 'data-tone': toneOf(server.state), 'data-open': open ? 'true' : undefined },
         h(
           'div',
-          { className: 'mc-item-top' },
+          { className: 'mc-item-head' },
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'mc-disclosure',
+              'aria-expanded': open ? 'true' : 'false',
+              onClick: () => setOpen((value) => !value),
+            },
+            h(Icon, { name: 'caret', className: open ? 'mc-icon-open' : undefined }),
+            h('span', { className: 'mc-name' }, server.serverName),
+          ),
           h(StateBadge, { state: server.state, label: server.stateLabel }),
-          h('span', { className: 'mc-name' }, server.serverName),
-          h('span', { className: 'mc-hint' }, t('toolsCount', { count: server.toolCount })),
+          server.toolCount > 0
+            ? h('span', { className: 'mc-chip' }, t('toolsCount', { count: server.toolCount }))
+            : null,
+          h('span', { className: 'mc-spacer' }),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'mc-btn mc-btn-sm',
+              disabled: busy !== '',
+              onClick: () => onAction('test', server),
+            },
+            busy === 'test' ? t('testing') : t('test'),
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'mc-btn mc-btn-sm',
+              disabled: busy !== '',
+              onClick: () => onAction('edit', server),
+            },
+            t('edit'),
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'mc-icon-btn',
+              'aria-label': t('moreActions'),
+              'aria-expanded': more ? 'true' : 'false',
+              title: t('moreActions'),
+              onClick: () => {
+                setMore((value) => !value)
+                if (more) setConfirming(false)
+              },
+            },
+            h(Icon, { name: 'more' }),
+          ),
         ),
         h(
           'div',
@@ -1503,88 +1677,70 @@ window.__ModuleLoader__.load({
         Array.isArray(server.notes) && server.notes.length > 0
           ? h('p', { className: 'mc-hint' }, server.notes.join('；'))
           : null,
-        h(
-          'div',
-          { className: 'mc-actions' },
-          h(
-            'button',
-            { type: 'button', className: 'mc-btn mc-btn-sm', onClick: () => setOpen((value) => !value) },
-            open ? t('collapse') : t('expand'),
-          ),
-          h(
-            'button',
-            {
-              type: 'button',
-              className: 'mc-btn mc-btn-sm',
-              disabled: busy !== '',
-              onClick: () => onAction('test', server),
-            },
-            busy === 'test' ? t('testing') : t('test'),
-          ),
-          h(
-            'button',
-            {
-              type: 'button',
-              className: 'mc-btn mc-btn-sm',
-              disabled: busy !== '' || server.disabled,
-              onClick: () => onAction('retry', server),
-            },
-            t('retry'),
-          ),
-          h(
-            'button',
-            {
-              type: 'button',
-              className: 'mc-btn mc-btn-sm',
-              disabled: busy !== '',
-              onClick: () => onAction(server.disabled ? 'enable' : 'disable', server),
-            },
-            server.disabled ? t('enable') : t('disable'),
-          ),
-          h(
-            'button',
-            {
-              type: 'button',
-              className: 'mc-btn mc-btn-sm',
-              disabled: busy !== '',
-              onClick: () => onAction('edit', server),
-            },
-            t('edit'),
-          ),
-          confirming
-            ? [
-              h(
-                'button',
-                {
-                  key: 'confirm',
-                  type: 'button',
-                  className: 'mc-btn mc-btn-sm mc-btn-danger',
-                  disabled: busy !== '',
-                  onClick: () => onAction('remove', server),
-                },
-                t('confirmRemove'),
-              ),
-              h(
-                'button',
-                { key: 'cancel', type: 'button', className: 'mc-btn mc-btn-sm', onClick: () => setConfirming(false) },
-                t('cancel'),
-              ),
-            ]
-            : h(
+        more
+          ? h(
+            'div',
+            { className: 'mc-more' },
+            h(
               'button',
               {
                 type: 'button',
-                className: 'mc-btn mc-btn-sm mc-btn-danger',
-                disabled: busy !== '',
-                onClick: () => setConfirming(true),
+                className: 'mc-btn mc-btn-sm',
+                disabled: busy !== '' || server.disabled,
+                onClick: () => onAction('retry', server),
               },
-              t('remove'),
+              t('retry'),
             ),
-        ),
+            h(
+              'button',
+              {
+                type: 'button',
+                className: 'mc-btn mc-btn-sm',
+                disabled: busy !== '',
+                onClick: () => onAction(server.disabled ? 'enable' : 'disable', server),
+              },
+              server.disabled ? t('enable') : t('disable'),
+            ),
+            confirming
+              ? [
+                h(
+                  'button',
+                  {
+                    key: 'confirm',
+                    type: 'button',
+                    className: 'mc-btn mc-btn-sm mc-btn-danger',
+                    disabled: busy !== '',
+                    onClick: () => onAction('remove', server),
+                  },
+                  t('confirmRemove'),
+                ),
+                h(
+                  'button',
+                  {
+                    key: 'cancel',
+                    type: 'button',
+                    className: 'mc-btn mc-btn-sm',
+                    onClick: () => setConfirming(false),
+                  },
+                  t('cancel'),
+                ),
+              ]
+              : h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'mc-btn mc-btn-sm mc-btn-danger',
+                  disabled: busy !== '',
+                  onClick: () => setConfirming(true),
+                },
+                t('remove'),
+              ),
+          )
+          : null,
         open
           ? h(
             'div',
-            { className: 'mc-note' },
+            { className: 'mc-details' },
             h(
               'dl',
               { className: 'mc-kv' },
@@ -1596,15 +1752,28 @@ window.__ModuleLoader__.load({
               h('dd', null, (server.capabilities ?? []).join('、') || t('none')),
               h('dt', null, t('serverLabel')),
               h('dd', null, server.serverInfo ? `${server.serverInfo.name ?? '?'} ${server.serverInfo.version ?? ''}` : t('none')),
-              h('dt', null, t('configLabel')),
-              h('dd', { className: 'mc-mono' }, JSON.stringify(server.config, null, 2)),
               h('dt', null, t('statsLabel')),
               h('dd', null, t('statsLine', server.stats)),
               server.reconnectAt ? h('dt', null, 'reconnect') : null,
               server.reconnectAt ? h('dd', null, formatTime(server.reconnectAt, locale)) : null,
             ),
-            h('p', { className: 'mc-hint' }, t('toolsLabel')),
-            h(ToolList, { tools: server.tools, t }),
+            h(
+              'div',
+              { className: 'mc-details-tools' },
+              h('p', { className: 'mc-hint' }, t('toolsLabel')),
+              h(ToolList, { tools: server.tools, t }),
+              server.tools.length > 0
+                ? h(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'mc-link-btn',
+                    onClick: () => copy(server.tools.map((tool) => tool.publicName ?? tool.name).join('\n'), 'tools'),
+                  },
+                  copied === 'tools' ? t('copied') : t('copyTools'),
+                )
+                : null,
+            ),
             credentialRefs && credentialRefs.length > 0
               ? h(
                 'div',
@@ -1627,7 +1796,37 @@ window.__ModuleLoader__.load({
                 ),
               )
               : null,
-            error ? h(Diagnostic, { error, t }) : null,
+            h(
+              'div',
+              { className: 'mc-details-config' },
+              h('p', { className: 'mc-hint' }, t('configLabel')),
+              h('pre', { className: 'mc-pre' }, JSON.stringify(server.config, null, 2)),
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'mc-link-btn',
+                  onClick: () => copy(JSON.stringify(server.config, null, 2), 'config'),
+                },
+                copied === 'config' ? t('copied') : t('copyConfig'),
+              ),
+            ),
+            error
+              ? h(
+                'div',
+                null,
+                h(Diagnostic, { error, t }),
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'mc-link-btn',
+                    onClick: () => copy(JSON.stringify(error, null, 2), 'diagnostic'),
+                  },
+                  copied === 'diagnostic' ? t('copied') : t('copyDiagnostic'),
+                ),
+              )
+              : null,
           )
           : null,
       )
@@ -1815,7 +2014,20 @@ window.__ModuleLoader__.load({
       const [busyId, setBusyId] = useState('')
       const [toast, setToast] = useState('')
       const [probeReport, setProbeReport] = useState(null)
+      const [query, setQuery] = useState('')
       const alive = useRef(true)
+      const lastFocus = useRef(null)
+      const openEditor = useCallback((next) => {
+        // Remember what had focus so closing the sheet returns it to the trigger.
+        if (typeof document !== 'undefined') lastFocus.current = document.activeElement
+        setEditor(next)
+      }, [])
+      const closeEditor = useCallback(() => {
+        setEditor(null)
+        const element = lastFocus.current
+        lastFocus.current = null
+        if (element && typeof element.focus === 'function') element.focus()
+      }, [])
 
       const refresh = useCallback(async () => {
         try {
@@ -1845,7 +2057,7 @@ window.__ModuleLoader__.load({
         setProbeReport(null)
         try {
           if (action === 'edit') {
-            setEditor({ mode: 'edit', server })
+            openEditor({ mode: 'edit', server })
             return
           }
           if (action === 'test') {
@@ -1894,14 +2106,28 @@ window.__ModuleLoader__.load({
               },
           })
         }
-        setEditor(null)
+        closeEditor()
         await refresh()
-      }, [refresh])
+      }, [closeEditor, refresh])
 
       const stats = snapshot?.stats
       const servers = snapshot?.servers ?? []
       const policy = snapshot?.config
       const credentialStatus = new Map((snapshot?.credentials ?? []).map((entry) => [entry.id, entry.refs]))
+      const needle = query.trim().toLowerCase()
+      const visible = needle === ''
+        ? servers
+        : servers.filter((server) => {
+          const haystack = [
+            server.serverName,
+            server.stateLabel,
+            server.config?.url ?? '',
+            server.config?.command ?? '',
+            ...(server.config?.args ?? []),
+            ...(server.tools ?? []).map((tool) => tool.publicName ?? tool.name),
+          ].join(' ').toLowerCase()
+          return haystack.includes(needle)
+        })
 
       return h(
         'div',
@@ -1941,11 +2167,37 @@ window.__ModuleLoader__.load({
           'div',
           { className: 'mc-toolbar' },
           h(
-            'button',
-            { type: 'button', className: 'mc-btn mc-btn-primary', onClick: () => setEditor({ mode: 'add' }) },
-            t('add'),
+            'div',
+            { className: 'mc-search' },
+            h(Icon, { name: 'search', className: 'mc-search-icon' }),
+            h('input', {
+              className: 'mc-input mc-search-input',
+              type: 'search',
+              'aria-label': t('search'),
+              placeholder: t('searchPlaceholder'),
+              value: query,
+              spellCheck: false,
+              onChange: (event) => setQuery(event.target.value),
+            }),
+            query !== ''
+              ? h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'mc-icon-btn mc-search-clear',
+                  'aria-label': t('clearSearch'),
+                  onClick: () => setQuery(''),
+                },
+                h(Icon, { name: 'close' }),
+              )
+              : null,
           ),
-          h('button', { type: 'button', className: 'mc-btn', onClick: refresh }, t('refresh')),
+          h('span', { className: 'mc-toolbar-spacer' }),
+          h(
+            'button',
+            { type: 'button', className: 'mc-btn mc-btn-icon', onClick: refresh, title: t('refresh'), 'aria-label': t('refresh') },
+            h(Icon, { name: 'reload' }),
+          ),
           h(
             'button',
             { type: 'button', className: 'mc-btn', onClick: () => setPanel(panel === 'import' ? '' : 'import') },
@@ -1956,12 +2208,28 @@ window.__ModuleLoader__.load({
             { type: 'button', className: 'mc-btn', onClick: () => setPanel(panel === 'export' ? '' : 'export') },
             t('export'),
           ),
-          h('span', { className: 'mc-toolbar-spacer' }),
-          h('span', { className: 'mc-hint' }, t('staleHint')),
+          h(
+            'button',
+            { type: 'button', className: 'mc-btn mc-btn-primary', onClick: () => openEditor({ mode: 'add' }) },
+            h(Icon, { name: 'plus' }),
+            t('actionAdd'),
+          ),
         ),
 
         loadError ? h(Note, { kind: 'error' }, `${t('loadFailed')}${loadError}`) : null,
-        !snapshot && !loadError ? h('p', { className: 'mc-hint' }, t('loading')) : null,
+        !snapshot && !loadError
+          ? h(
+            'ul',
+            { className: 'mc-list', 'aria-hidden': 'true' },
+            [0, 1, 2].map((index) => h(
+              'li',
+              { key: index, className: 'mc-skeleton' },
+              h('span', { className: 'mc-skel-line mc-skel-title' }),
+              h('span', { className: 'mc-skel-line mc-skel-meta' }),
+              h('span', { className: 'mc-skel-line mc-skel-meta mc-skel-short' }),
+            )),
+          )
+          : null,
 
         editor
           ? h(ServerDialog, {
@@ -1970,7 +2238,7 @@ window.__ModuleLoader__.load({
             server: editor.server,
             allowedTransports: policy?.allowedTransports ?? ['stdio', 'streamable-http'],
             t,
-            onCancel: () => setEditor(null),
+            onCancel: closeEditor,
             onSaved: afterSave,
             credentialRefs: editor.server ? (credentialStatus.get(editor.server.id) ?? []) : [],
             dataDir: policy?.dataDir ?? '',
@@ -2009,19 +2277,30 @@ window.__ModuleLoader__.load({
             h('p', { className: 'mc-intro' }, t('empty')),
             h('p', { className: 'mc-hint' }, t('emptyHint')),
           )
-          : h(
-            'ul',
-            { className: 'mc-list' },
-            servers.map((server) => h(ServerItem, {
-              key: server.id,
-              server,
-              t,
-              locale,
-              busy: busyId?.id === server.id ? busyId.action : '',
-              onAction: act,
-              credentialRefs: credentialStatus.get(server.id) ?? [],
-            })),
-          ),
+          : visible.length === 0
+            ? h(
+              'div',
+              { className: 'mc-empty' },
+              h('p', { className: 'mc-intro' }, t('noMatch', { query: query.trim() })),
+              h(
+                'button',
+                { type: 'button', className: 'mc-btn mc-btn-sm', onClick: () => setQuery('') },
+                t('clearSearch'),
+              ),
+            )
+            : h(
+              'ul',
+              { className: 'mc-list' },
+              visible.map((server) => h(ServerItem, {
+                key: server.id,
+                server,
+                t,
+                locale,
+                busy: busyId?.id === server.id ? busyId.action : '',
+                onAction: act,
+                credentialRefs: credentialStatus.get(server.id) ?? [],
+              })),
+            ),
       )
     }
 
