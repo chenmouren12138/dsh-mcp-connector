@@ -45,7 +45,8 @@ window.__ModuleLoader__.load({
       add: '添加服务器',
       refresh: '刷新',
       search: '搜索服务器',
-      searchPlaceholder: '搜索名称、地址或工具…',
+      searchPlaceholder: '按名称搜索…',
+      filteringBy: '按「{query}」筛选：{count} 台匹配',
       clearSearch: '清除搜索',
       noMatch: '没有匹配「{query}」的服务器',
       moreActions: '更多操作',
@@ -221,7 +222,8 @@ window.__ModuleLoader__.load({
       add: 'Add server',
       refresh: 'Refresh',
       search: 'Search servers',
-      searchPlaceholder: 'Search name, endpoint or tool…',
+      searchPlaceholder: 'Search by name…',
+      filteringBy: 'Filtering by “{query}”: {count} matched',
       clearSearch: 'Clear search',
       noMatch: 'No server matches “{query}”',
       moreActions: 'More actions',
@@ -586,6 +588,9 @@ window.__ModuleLoader__.load({
       '.mc-search-input[data-filtering="true"]{padding-right:66px}',
       '.mc-search-input::-webkit-search-cancel-button,.mc-search-input::-ms-clear{display:none}',
       '.mc-search-clear{position:absolute;right:1px}',
+      '.mc-filter-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;',
+      'margin:0;padding:6px 10px;border-radius:var(--dsw-radius-sm);background:var(--dsw-alias-bg-layer-2);',
+      'font-size:12.5px;line-height:18px;color:var(--dsw-alias-label-secondary)}',
       '.mc-search-count{position:absolute;right:26px;font-size:12px;line-height:18px;pointer-events:none;',
       'color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}',
       '.mc-item-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
@@ -2151,6 +2156,15 @@ window.__ModuleLoader__.load({
             t('actionAdd'),
           ),
         ),
+
+        query.trim() !== ''
+          ? h(
+            'div',
+            { className: 'mc-filter-bar' },
+            h('span', null, t('filteringBy', { query: query.trim(), count: visible.length })),
+            h('button', { type: 'button', className: 'mc-link-btn', onClick: () => setQuery('') }, t('clearSearch')),
+          )
+          : null,
 
         loadError ? h(Note, { kind: 'error' }, `${t('loadFailed')}${loadError}`) : null,
         !snapshot && !loadError
