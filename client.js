@@ -537,10 +537,23 @@ window.__ModuleLoader__.load({
       '.mc-act-test{color:var(--dsw-alias-label-secondary)}',
       '.mc-act-retry{color:var(--dsw-alias-state-business-primary)}',
       '.mc-act-power{color:var(--dsw-alias-label-secondary)}',
-      '.mc-act-power[data-on="false"]{color:var(--dsw-alias-state-warning-primary,var(--dsw-alias-label-secondary))}',
+      '.mc-act-power[data-tone="off"]{color:var(--dsw-alias-state-warning-primary,var(--dsw-alias-label-secondary))}',
       '.mc-act-edit{color:var(--dsw-alias-label-secondary)}',
-      '.mc-act-power[data-on="true"]{color:var(--dsw-alias-state-success-primary,var(--dsw-alias-state-business-primary))}',
+      '.mc-act-power[data-tone="on"]{color:var(--dsw-alias-state-success-primary,var(--dsw-alias-state-business-primary))}',
       '.mc-act-danger{color:var(--dsw-alias-state-error-primary)}',
+      '.mc-tip-wrap{position:relative;display:inline-flex;flex:none}',
+      '.mc-tip{position:absolute;left:50%;bottom:calc(100% + 6px);z-index:70;',
+      'transform:translate(-50%,2px);opacity:0;pointer-events:none;white-space:nowrap;',
+      'padding:4px 8px;border-radius:var(--dsw-radius-sm);font-size:11.5px;line-height:16px;',
+      'color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-3);',
+      'border:.5px solid var(--dsw-alias-border-l3);box-shadow:0 6px 18px rgba(0,0,0,.18);',
+      'transition:opacity .12s ease,transform .12s ease;transition-delay:.18s}',
+      '.mc-tip-wrap:hover>.mc-tip,.mc-tip-wrap:focus-within>.mc-tip{opacity:1;transform:translate(-50%,0)}',
+      '.mc-actions .mc-tip-wrap:first-child>.mc-tip{left:0;transform:translate(0,2px)}',
+      '.mc-actions .mc-tip-wrap:first-child:hover>.mc-tip{transform:translate(0,0)}',
+      '.mc-actions .mc-tip-wrap:last-child>.mc-tip{left:auto;right:0;transform:translate(0,2px)}',
+      '.mc-actions .mc-tip-wrap:last-child:hover>.mc-tip{transform:translate(0,0)}',
+
       '.mc-act-danger:hover:not(:disabled){background:var(--dsw-alias-bg-layer-3)}',
       '.mc-icon-danger{color:var(--dsw-alias-state-error-primary)}',
       '.mc-item .mc-note{margin:0}',
@@ -863,6 +876,31 @@ window.__ModuleLoader__.load({
         },
         title ? h('title', null, title) : null,
         h('path', { d: ICON_PATHS[name] ?? ICON_PATHS.more }),
+      )
+    }
+
+    /**
+     * Icon button with a DSH-style hint bubble. A native title attribute renders
+     * with OS chrome, delays for about a second and cannot be themed, so the
+     * tooltip is drawn here with the same tokens as the rest of the shell.
+     */
+    function TipButton({ label, icon, className, disabled, onClick, tone }) {
+      return h(
+        'span',
+        { className: 'mc-tip-wrap' },
+        h(
+          'button',
+          {
+            type: 'button',
+            className: className ? `${className} mc-icon-btn` : 'mc-icon-btn',
+            'aria-label': label,
+            'data-tone': tone,
+            disabled,
+            onClick,
+          },
+          h(Icon, { name: icon }),
+        ),
+        h('span', { className: 'mc-tip', role: 'tooltip' }, label),
       )
     }
 
@@ -1692,100 +1730,62 @@ window.__ModuleLoader__.load({
             ? h('span', { className: 'mc-chip' }, t('toolsCount', { count: server.toolCount }))
             : null,
           h('span', { className: 'mc-spacer' }),
-          // One segmented bar with semantic colour per action: test/edit neutral,
-          // retry business, power success/warning by state, delete danger.
           h(
             'div',
             { className: 'mc-actions', role: 'group', 'aria-label': t('rowActions') },
-            h(
-              'button',
-              {
-                type: 'button',
-                className: 'mc-icon-btn mc-act-test',
-                title: t('test'),
-                'aria-label': t('test'),
-                disabled: busy !== '',
-                onClick: () => onAction('test', server),
-              },
-              h(Icon, { name: 'plug' }),
-            ),
-            h(
-              'button',
-              {
-                type: 'button',
-                className: 'mc-icon-btn mc-act-retry',
-                title: t('retry'),
-                'aria-label': t('retry'),
-                disabled: busy !== '' || server.disabled,
-                onClick: () => onAction('retry', server),
-              },
-              h(Icon, { name: 'retry' }),
-            ),
-            h(
-              'button',
-              {
-                type: 'button',
-                className: 'mc-icon-btn mc-act-power',
-                'data-on': server.disabled ? 'false' : 'true',
-                title: server.disabled ? t('enable') : t('disable'),
-                'aria-label': server.disabled ? t('enable') : t('disable'),
-                disabled: busy !== '',
-                onClick: () => onAction(server.disabled ? 'enable' : 'disable', server),
-              },
-              h(Icon, { name: 'power' }),
-            ),
-            h(
-              'button',
-              {
-                type: 'button',
-                className: 'mc-icon-btn mc-act-edit',
-                title: t('edit'),
-                'aria-label': t('edit'),
-                disabled: busy !== '',
-                onClick: () => onAction('edit', server),
-              },
-              h(Icon, { name: 'pencil' }),
-            ),
+            h(TipButton, {
+              label: t('test'),
+              icon: 'plug',
+              className: 'mc-act-test',
+              disabled: busy !== '',
+              onClick: () => onAction('test', server),
+            }),
+            h(TipButton, {
+              label: t('retry'),
+              icon: 'retry',
+              className: 'mc-act-retry',
+              disabled: busy !== '' || server.disabled,
+              onClick: () => onAction('retry', server),
+            }),
+            h(TipButton, {
+              label: server.disabled ? t('enable') : t('disable'),
+              icon: 'power',
+              className: 'mc-act-power',
+              tone: server.disabled ? 'off' : 'on',
+              disabled: busy !== '',
+              onClick: () => onAction(server.disabled ? 'enable' : 'disable', server),
+            }),
+            h(TipButton, {
+              label: t('edit'),
+              icon: 'pencil',
+              className: 'mc-act-edit',
+              disabled: busy !== '',
+              onClick: () => onAction('edit', server),
+            }),
             confirming
               ? [
-                h(
-                  'button',
-                  {
-                    key: 'confirm',
-                    type: 'button',
-                    className: 'mc-icon-btn mc-act-danger',
-                    title: t('confirmRemove'),
-                    'aria-label': t('confirmRemove'),
-                    disabled: busy !== '',
-                    onClick: () => onAction('remove', server),
-                  },
-                  h(Icon, { name: 'check' }),
-                ),
-                h(
-                  'button',
-                  {
-                    key: 'cancel',
-                    type: 'button',
-                    className: 'mc-icon-btn',
-                    title: t('cancel'),
-                    'aria-label': t('cancel'),
-                    onClick: () => setConfirming(false),
-                  },
-                  h(Icon, { name: 'close' }),
-                ),
-              ]
-              : h(
-                'button',
-                {
-                  type: 'button',
-                  className: 'mc-icon-btn mc-act-danger',
-                  title: t('remove'),
-                  'aria-label': t('remove'),
+                h(TipButton, {
+                  key: 'confirm',
+                  label: t('confirmRemove'),
+                  icon: 'check',
+                  className: 'mc-act-danger',
                   disabled: busy !== '',
-                  onClick: () => setConfirming(true),
-                },
-                h(Icon, { name: 'trash' }),
-              ),
+                  onClick: () => onAction('remove', server),
+                }),
+                h(TipButton, {
+                  key: 'cancel',
+                  label: t('cancel'),
+                  icon: 'close',
+                  onClick: () => setConfirming(false),
+                }),
+              ]
+              : h(TipButton, {
+                label: t('remove'),
+                icon: 'trash',
+                className: 'mc-act-danger',
+                disabled: busy !== '',
+                onClick: () => setConfirming(true),
+              }),
           ),
         ),
         h(
@@ -2277,18 +2277,11 @@ window.__ModuleLoader__.load({
             h(Icon, { name: 'plus' }),
             t('actionAdd'),
           ),
-          h(
-            'button',
-            {
-              type: 'button',
-              className: 'mc-icon-btn',
-              'aria-label': t('moreActions'),
-              'aria-expanded': toolsMenu ? 'true' : 'false',
-              title: t('moreActions'),
-              onClick: () => setToolsMenu((value) => !value),
-            },
-            h(Icon, { name: 'more' }),
-          ),
+          h(TipButton, {
+            label: t('moreActions'),
+            icon: 'more',
+            onClick: () => setToolsMenu((value) => !value),
+          }),
         ),
         toolsMenu
           ? h(

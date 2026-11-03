@@ -632,7 +632,11 @@ await check('列表行动作：禁用 / 重试 / 测试 / 删除二次确认', a
   for (const label of ['测试连接', '重试连接', '禁用', '编辑', '删除']) {
     const button = byAria(card(), label)
     assert.ok(button, `${label} icon present`)
-    assert.equal(button.props.title, label, `${label} tooltip`)
+    // DSH-style bubble owned by the page, not the OS title tooltip.
+    assert.equal(button.props.title, undefined, `${label} has no native title`)
+    const tip = findAll(card(), (node) => node.props?.className === 'mc-tip' && textOf(node) === label)[0]
+    assert.ok(tip, `${label} tooltip bubble`)
+    assert.equal(tip.props.role, 'tooltip')
   }
   const probeCard = () => findAll(rowList(), (node) => node.props?.className === 'mc-item' && textOf(node).includes('probe'))[0]
   const disable = byAria(card(), '禁用')
