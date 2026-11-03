@@ -584,6 +584,8 @@ await check('添加 MCP 调用 addServer 并展示挂载回执', async () => {
   const call = calls.filter((item) => item.action === 'addServer').at(-1)
   assert.ok(call, 'addServer called')
   assert.equal(call.payload.config.command, 'node')
+  assert.equal(call.payload.disabled, false, 'saving always enables')
+  assert.ok(!textOf(root).includes('保存后禁用'), 'no disabled switch in the dialog')
   assert.match(textOf(root), /已添加服务器/)
 })
 

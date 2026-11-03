@@ -130,7 +130,6 @@ window.__ModuleLoader__.load({
       fieldUrlHint: 'Streamable HTTP 端点，例如 https://example.com/mcp。',
       fieldHeaders: '其他请求头',
       fieldHeadersHint: '每行 KEY: VALUE。鉴权头在上面单独管理；这里放租户、版本这类非敏感头。密钥也可写成 ${credential:名称}。',
-      fieldDisabled: '保存后禁用',
       authTitle: '鉴权',
       authHint: '头名从令牌库选择，右侧填令牌。保存后只写入 DSH 凭据库，注册表里只留 ${credential:…} 引用。',
       authHeaderLabel: '请求头',
@@ -301,7 +300,6 @@ window.__ModuleLoader__.load({
       fieldUrlHint: 'Streamable HTTP endpoint, e.g. https://example.com/mcp.',
       fieldHeaders: 'Other headers',
       fieldHeadersHint: 'One KEY: VALUE per line. The auth header is managed above; use this for tenant, version and other non-secret headers. Secrets may also be written as ${credential:NAME}.',
-      fieldDisabled: 'Save as disabled',
       authTitle: 'Authentication',
       authHint: 'Pick the header name from the token library and enter the token. Saving writes only to the DSH credential store; the registry keeps a ${credential:…} reference.',
       authHeaderLabel: 'Header',
@@ -895,7 +893,6 @@ window.__ModuleLoader__.load({
       url: '',
       headersText: '',
       timeoutMs: '',
-      disabled: false,
     }
 
     function draftOf(server) {
@@ -912,7 +909,6 @@ window.__ModuleLoader__.load({
           url: '',
           headersText: '',
           timeoutMs,
-          disabled: Boolean(server.disabled),
         }
       }
       return {
@@ -925,7 +921,6 @@ window.__ModuleLoader__.load({
         url: config.url ?? '',
         headersText: formatPairLines(config.headers, ':'),
         timeoutMs,
-        disabled: Boolean(server.disabled),
       }
     }
 
@@ -1061,7 +1056,9 @@ window.__ModuleLoader__.load({
       const firstFieldError = Object.values(fieldErrors).find(Boolean) ?? ''
       const buildPayload = useCallback(() => ({
         serverName: draft.serverName.trim(),
-        disabled: draft.disabled,
+        // Saving always means "connect": the form has no disabled switch, so a
+        // server edited here comes back enabled even if import left it stopped.
+        disabled: false,
         config: draftToConfig(draft),
       }), [draft])
 
@@ -1472,16 +1469,6 @@ window.__ModuleLoader__.load({
                     h('p', { className: 'mc-hint' }, t('fieldHeadersHint')),
                   )
                   : null,
-                h(
-                  'label',
-                  { className: 'mc-check' },
-                  h('input', {
-                    type: 'checkbox',
-                    checked: draft.disabled,
-                    onChange: (event) => patch({ disabled: event.target.checked }),
-                  }),
-                  t('fieldDisabled'),
-                ),
                 errors.length > 0 ? h(Note, { kind: 'error' }, errors.join('；')) : null,
                 toast ? h(Note, { kind: 'ok' }, toast) : null,
                 probe ? h(ProbeReport, { report: probe, t }) : null,
