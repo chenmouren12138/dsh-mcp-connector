@@ -97,16 +97,28 @@ window.__ModuleLoader__.load({
       tabJson: 'JSON',
       typeTabs: 'Filter by type',
       tabAll: 'All',
-      tabStdio: 'stdio',
-      tabHttp: 'Streamable HTTP',
-      tabSse: 'SSE',
       noTypeMatch: 'No {type} server yet',
+      categoryLabel: 'Category',
+      categoryAuto: 'Auto',
+      categoryPrototype: 'Prototype',
+      categoryDesign: 'Design',
+      categoryDocs: 'Docs',
+      categoryCode: 'Code',
+      categoryData: 'Data',
+      categoryBrowse: 'Browser',
+      categoryOther: 'Other',
       typeTabs: '按类型筛选',
       tabAll: '全部',
-      tabStdio: 'stdio',
-      tabHttp: 'Streamable HTTP',
-      tabSse: 'SSE',
       noTypeMatch: '{type} 类型下还没有服务器',
+      categoryLabel: '类型',
+      categoryAuto: '自动识别',
+      categoryPrototype: '原型',
+      categoryDesign: '设计',
+      categoryDocs: '文档',
+      categoryCode: '代码',
+      categoryData: '数据',
+      categoryBrowse: '浏览器',
+      categoryOther: '其他',
       jsonHint: '可直接编辑该服务器的 JSON；切回表单会应用合法内容。',
       jsonInvalid: 'JSON 不合法：{message}',
       actionAdd: '添加 MCP',
@@ -311,12 +323,15 @@ window.__ModuleLoader__.load({
       '.mc-btn:focus-visible,.mc-input:focus-visible,.mc-textarea:focus-visible,.mc-select:focus-visible',
       '{outline:var(--dsw-focus-ring-width) solid',
       'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:2px}',
-      '.mc-type-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}',
-      '.mc-type-tab{display:inline-flex;align-items:flex-start;gap:6px;padding:5px 10px;border-radius:var(--dsw-radius-sm);border:1px solid var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;cursor:pointer;transition:background .15s ease,color .15s ease,border-color .15s ease}',
-      '.mc-type-tab:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}',
-      '.mc-type-tab.is-active{background:var(--dsw-alias-bg-layer-3);border-color:var(--dsw-alias-border-l3);color:var(--dsw-alias-label-primary)}',
-      '.mc-type-tab-label{line-height:16px}',
-      '.mc-type-tab-count{min-width:16px;padding:0 4px;border-radius:8px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:16px;text-align:center;align-self:flex-start}',
+      '.mc-type-tabs{display:flex;gap:20px;margin:0 0 10px;border-bottom:.5px solid var(--dsw-alias-border-l2)}',
+      '.mc-type-tab{position:relative;display:inline-flex;align-items:flex-start;gap:4px;padding:6px 1px 8px;',
+      'border:0;background:0 0;font:inherit;font-size:13px;color:var(--dsw-alias-label-tertiary);cursor:pointer}',
+      '.mc-type-tab:hover{color:var(--dsw-alias-label-secondary)}',
+      '.mc-type-tab.is-active{color:var(--dsw-alias-label-primary)}',
+      '.mc-type-tab.is-active:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;',
+      'border-radius:2px 2px 0 0;background:var(--dsw-alias-label-primary)}',
+      '.mc-type-tab-label{line-height:18px}',
+      '.mc-type-tab-count{color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:16px}',
       '.mc-type-tab.is-active .mc-type-tab-count{color:var(--dsw-alias-label-secondary)}',
       '.mc-list-editor{list-style:none;margin:0;padding:0}',
       '.mc-list-editor .mc-panel{margin-top:2px}',
@@ -1042,6 +1057,47 @@ window.__ModuleLoader__.load({
       return 'stdio'
     }
 
+    /** Product categories shown as text tabs; a server can override the guess. */
+    const CATEGORY_OPTIONS = [
+      { key: '', labelKey: 'categoryAuto' },
+      { key: 'prototype', labelKey: 'categoryPrototype' },
+      { key: 'design', labelKey: 'categoryDesign' },
+      { key: 'docs', labelKey: 'categoryDocs' },
+      { key: 'code', labelKey: 'categoryCode' },
+      { key: 'data', labelKey: 'categoryData' },
+      { key: 'browse', labelKey: 'categoryBrowse' },
+      { key: 'other', labelKey: 'categoryOther' },
+    ]
+
+    const CATEGORY_RULES = [
+      { key: 'prototype', words: ['figma', 'pixso', 'mastergo', 'modao', '墨刀', 'sketch', 'axure', 'lanhu', '蓝湖', 'zeplin', '原型'] },
+      { key: 'design', words: ['design', 'icon', 'image', 'unsplash', 'canva', '设计', '素材'] },
+      { key: 'docs', words: ['notion', 'confluence', 'yuque', '语雀', 'feishu', '文档', 'wiki'] },
+      { key: 'code', words: ['github', 'gitlab', 'gitee', 'sentry', 'linear', 'jira', 'repo', '代码'] },
+      { key: 'data', words: ['postgres', 'mysql', 'sqlite', 'database', 'mongo', 'redis', 'elastic', 'supabase', '数据'] },
+      { key: 'browse', words: ['browser', 'playwright', 'puppeteer', 'chrome', 'selenium', '浏览器'] },
+    ]
+
+    /** Guess a product category from the name, the endpoint and the tool names. */
+    function inferCategory(server) {
+      const haystack = [
+        server?.serverName,
+        server?.config?.url,
+        server?.config?.command,
+        ...(Array.isArray(server?.tools) ? server.tools.map((tool) => tool.publicName ?? tool.name) : []),
+      ].filter(Boolean).join(' ').toLowerCase()
+      for (const rule of CATEGORY_RULES) {
+        if (rule.words.some((word) => haystack.includes(word))) return rule.key
+      }
+      return 'other'
+    }
+
+    const categoryOf = (server) => server?.config?.category ?? inferCategory(server)
+    const categoryLabel = (key, t) => {
+      const option = CATEGORY_OPTIONS.find((item) => item.key === key) ?? CATEGORY_OPTIONS[CATEGORY_OPTIONS.length - 1]
+      return option.key === '' ? t('categoryAuto') : t(option.labelKey)
+    }
+
     /** First present value among the ecosystem's spellings of one field. */
     function pickField(object, keys) {
       for (const key of keys) {
@@ -1080,6 +1136,7 @@ window.__ModuleLoader__.load({
           argsText: args.join('\n'),
           envText: formatPairLines(env, '='),
           cwd,
+          category: config.category ?? '',
           url: '',
           headersText: '',
           timeoutMs,
@@ -1092,6 +1149,7 @@ window.__ModuleLoader__.load({
         argsText: '',
         envText: '',
         cwd: '',
+        category: config.category ?? '',
         url: String(pickField(config, FIELD_ALIASES.url) ?? ''),
         headersText: formatPairLines(pickField(config, FIELD_ALIASES.headers), ':'),
         timeoutMs,
@@ -1119,6 +1177,8 @@ window.__ModuleLoader__.load({
     function draftToConfig(draft) {
       const timeout = Number(draft.timeoutMs)
       const timeoutField = Number.isFinite(timeout) && timeout >= 1000 ? { toolCallTimeoutMs: timeout } : {}
+      const category = String(draft.category ?? '').trim()
+      const categoryField = category === '' ? {} : { category }
       if (draft.transport === 'stdio') {
         return {
           transport: 'stdio',
@@ -1127,6 +1187,7 @@ window.__ModuleLoader__.load({
           env: parsePairLines(draft.envText, '='),
           cwd: draft.cwd.trim(),
           ...timeoutField,
+          ...categoryField,
         }
       }
       return {
@@ -1134,6 +1195,7 @@ window.__ModuleLoader__.load({
         url: draft.url.trim(),
         headers: parsePairLines(draft.headersText, ':'),
         ...timeoutField,
+        ...categoryField,
       }
     }
 
@@ -1706,6 +1768,22 @@ window.__ModuleLoader__.load({
                   shown.serverName
                     ? h('p', { className: 'mc-hint mc-err' }, shown.serverName)
                     : h('p', { className: 'mc-hint' }, mode === 'edit' && server ? t('agentNameHint', { name: server.serverName }) : t('fieldNameHint')),
+                ),
+                h(
+                  'div',
+                  { className: 'mc-field' },
+                  h('label', { className: 'mc-label' }, t('categoryLabel')),
+                  h(Select, {
+                    label: t('categoryLabel'),
+                    value: draft.category ?? '',
+                    options: CATEGORY_OPTIONS.map((option) => ({ value: option.key, label: t(option.labelKey) })),
+                    onChange: (value) => patch({ category: value }),
+                  }),
+                  h(
+                    'p',
+                    { className: 'mc-hint' },
+                    draft.category ? t('categoryPinned') : t('categoryGuessed', { name: categoryLabel(inferCategory({ serverName: draft.serverName, config: { url: draft.url } }), t) }),
+                  ),
                 ),
                 h(
                   'div',
@@ -2453,20 +2531,20 @@ window.__ModuleLoader__.load({
         if (left !== right) return right - left
         return String(a.serverName ?? '').localeCompare(String(b.serverName ?? ''))
       }
-      const typeOf = (server) => server.config?.transport ?? 'streamable-http'
-      const typeCounts = { all: servers.length, stdio: 0, 'streamable-http': 0, sse: 0 }
+      const categoryCounts = new Map()
       for (const server of servers) {
-        const type = typeOf(server)
-        if (type in typeCounts) typeCounts[type] += 1
+        const key = categoryOf(server)
+        categoryCounts.set(key, (categoryCounts.get(key) ?? 0) + 1)
       }
       const typeTabs = [
-        { key: 'all', label: t('tabAll'), count: typeCounts.all },
-        { key: 'stdio', label: t('tabStdio'), count: typeCounts.stdio },
-        { key: 'streamable-http', label: t('tabHttp'), count: typeCounts['streamable-http'] },
-        { key: 'sse', label: t('tabSse'), count: typeCounts.sse },
-      ].filter((tab) => tab.key === 'all' || tab.count > 0)
+        { key: 'all', label: t('tabAll'), count: servers.length },
+        ...CATEGORY_OPTIONS
+          .filter((option) => option.key !== '')
+          .map((option) => ({ key: option.key, label: t(option.labelKey), count: categoryCounts.get(option.key) ?? 0 }))
+          .filter((tab) => tab.count > 0),
+      ]
 
-      const matchesType = (server) => typeFilter === 'all' || typeOf(server) === typeFilter
+      const matchesType = (server) => typeFilter === 'all' || categoryOf(server) === typeFilter
       const visible = (needle === ''
         ? servers.filter(matchesType)
         : servers.filter(matchesType).filter((server) => String(server.serverName ?? '').toLowerCase().includes(needle))
@@ -2656,7 +2734,7 @@ window.__ModuleLoader__.load({
               h(
                 'p',
                 { className: 'mc-intro' },
-                query.trim() === '' ? t('noTypeMatch', { type: typeFilter === 'all' ? t('tabAll') : typeFilter }) : t('noMatch', { query: query.trim() }),
+                query.trim() === '' ? t('noTypeMatch', { type: categoryLabel(typeFilter, t) }) : t('noMatch', { query: query.trim() }),
               ),
               h(
                 'button',
