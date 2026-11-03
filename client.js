@@ -1706,7 +1706,18 @@ window.__ModuleLoader__.load({
 
       return h(
         'li',
-        { className: 'mc-item', 'data-tone': toneOf(server.state), 'data-open': open ? 'true' : undefined },
+        {
+          className: 'mc-item',
+          'data-tone': toneOf(server.state),
+          'data-open': open ? 'true' : undefined,
+          'data-search': [
+            server.serverName,
+            server.config?.url ?? '',
+            server.config?.command ?? '',
+            ...(server.config?.args ?? []),
+            ...(server.tools ?? []).map((tool) => tool.publicName ?? tool.name),
+          ].join(' ').toLowerCase(),
+        },
         h(
           'div',
           { className: 'mc-item-head' },
@@ -1899,6 +1910,9 @@ window.__ModuleLoader__.load({
       const [feedback, setFeedback] = useState({})
       const feedbackTimers = useRef(new Map())
       const searchRef = useRef(null)
+      const listRef = useRef(null)
+      const filterBarRef = useRef(null)
+      const filterTextRef = useRef(null)
       const alive = useRef(true)
       const lastFocus = useRef(null)
       const openEditor = useCallback((next) => {
@@ -1959,17 +1973,54 @@ window.__ModuleLoader__.load({
         timers.set(id, timer)
       }, [])
 
+      /**
+       * Name filter applied straight to the DOM. React state filtering above still
+       * drives the count, but this path cannot be broken by a missed re-render: it
+       * hides cards by their `data-search` text as the user types.
+       */
+      const applyNameFilter = useCallback(() => {
+        const input = searchRef.current
+        const list = listRef.current
+        if (!input || !list || typeof list.querySelectorAll !== 'function') return
+        const needle = String(input.value ?? '').trim().toLowerCase()
+        let shown = 0
+        for (const item of list.querySelectorAll('[data-search]')) {
+          const hit = needle === '' || String(item.getAttribute('data-search') ?? '').includes(needle)
+          item.style.display = hit ? '' : 'none'
+          if (hit) shown += 1
+        }
+        const bar = filterBarRef.current
+        const text = filterTextRef.current
+        if (bar && text) {
+          if (needle === '') {
+            bar.style.display = 'none'
+          } else {
+            bar.style.display = 'flex'
+            text.textContent = t('filteringBy', { query: needle, count: shown })
+          }
+        }
+      }, [t])
+
+      // Re-apply after every render so a poll refresh cannot un-hide cards.
+      useEffect(() => {
+        applyNameFilter()
+      })
+
       useEffect(() => {
         const node = searchRef.current
         if (!node || typeof node.addEventListener !== 'function') return undefined
         const apply = () => setQuery(node.value)
-        node.addEventListener('input', apply)
-        node.addEventListener('compositionend', apply)
-        return () => {
-          node.removeEventListener('input', apply)
-          node.removeEventListener('compositionend', apply)
+        const applyBoth = () => {
+          apply()
+          applyNameFilter()
         }
-      }, [])
+        node.addEventListener('input', applyBoth)
+        node.addEventListener('compositionend', applyBoth)
+        return () => {
+          node.removeEventListener('input', applyBoth)
+          node.removeEventListener('compositionend', applyBoth)
+        }
+      }, [applyNameFilter])
 
       const refreshNow = useCallback(async () => {
         setRefreshing(true)
@@ -2157,14 +2208,24 @@ window.__ModuleLoader__.load({
           ),
         ),
 
-        query.trim() !== ''
-          ? h(
-            'div',
-            { className: 'mc-filter-bar' },
-            h('span', null, t('filteringBy', { query: query.trim(), count: visible.length })),
-            h('button', { type: 'button', className: 'mc-link-btn', onClick: () => setQuery('') }, t('clearSearch')),
-          )
-          : null,
+        h(
+          'div',
+          { className: 'mc-filter-bar', ref: filterBarRef, style: { display: 'none' } },
+          h('span', { ref: filterTextRef }),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'mc-link-btn',
+              onClick: () => {
+                if (searchRef.current) searchRef.current.value = ''
+                setQuery('')
+                applyNameFilter()
+              },
+            },
+            t('clearSearch'),
+          ),
+        ),
 
         loadError ? h(Note, { kind: 'error' }, `${t('loadFailed')}${loadError}`) : null,
         !snapshot && !loadError
@@ -2234,7 +2295,7 @@ window.__ModuleLoader__.load({
             )
             : h(
               'ul',
-              { className: 'mc-list' },
+              { className: 'mc-list', ref: listRef },
               visible.map((server) => h(ServerItem, {
                 key: server.id,
                 server,
