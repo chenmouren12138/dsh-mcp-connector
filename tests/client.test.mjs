@@ -677,12 +677,14 @@ await check('搜索过滤与无结果态，图标为矢量而非 emoji', async (
   assert.ok(!textOf(root).includes('🔑'), 'no emoji as structural icon')
 
   const search = findAll(root, (node) => node.props?.['aria-label'] === '搜索服务器')[0]
+  assert.equal(search.props.type, 'text', 'plain text input: no native clear button')
   assert.ok(search, 'search input')
   search.props.onChange({ target: { value: 'broken' } })
   rerender()
   const list = findAll(root, (node) => node.props?.className === 'mc-list')[0]
   assert.match(textOf(list), /broken/)
   assert.ok(!textOf(list).includes('demo'), 'non-matching row hidden')
+  assert.match(textOf(root), /匹配 1 台/, 'match count shown while filtering')
 
   search.props.onChange({ target: { value: 'nothing-matches' } })
   rerender()

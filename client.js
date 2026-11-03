@@ -32,6 +32,7 @@ window.__ModuleLoader__.load({
       intro: '把外部 MCP 服务器的工具接入本部署：以 mcp__<服务器>__<工具> 命名注册，随插件卸装自动注销。',
       summary: '{servers} 台服务器 · {ready} 就绪 · {tools} 个工具',
       refreshed: '已刷新',
+      matchCount: '匹配 {count} 台',
       statServers: '服务器',
       statReady: '就绪',
       statTools: '工具',
@@ -206,6 +207,7 @@ window.__ModuleLoader__.load({
       intro: 'Bridge external MCP servers into this deployment: tools register as mcp__<server>__<tool> and unregister with the plugin.',
       summary: '{servers} servers · {ready} ready · {tools} tools',
       refreshed: 'Refreshed',
+      matchCount: '{count} matched',
       statServers: 'Servers',
       statReady: 'Ready',
       statTools: 'Tools',
@@ -576,7 +578,8 @@ window.__ModuleLoader__.load({
       '.mc-item .mc-note{margin:0}',
       '.mc-search{position:relative;display:flex;align-items:center;flex:1 1 220px;max-width:340px;min-width:0}',
       '.mc-search-icon{position:absolute;left:8px;color:var(--dsw-alias-label-tertiary);pointer-events:none}',
-      '.mc-search-input{padding-left:28px;padding-right:28px}',
+      '.mc-search-input{padding-left:28px;padding-right:28px;-webkit-appearance:none;appearance:none}',
+      '.mc-search-input::-webkit-search-cancel-button,.mc-search-input::-ms-clear{display:none}',
       '.mc-search-clear{position:absolute;right:1px}',
       '.mc-item-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
       '.mc-disclosure{display:inline-flex;align-items:center;gap:6px;padding:0;font:inherit;',
@@ -2063,6 +2066,9 @@ window.__ModuleLoader__.load({
                 ready: stats.ready + stats.degraded,
               })
               : null,
+            stats && query.trim() !== ''
+              ? h('span', { className: 'mc-refreshed' }, ` · ${t('matchCount', { count: visible.length })}`)
+              : null,
             refreshNote ? h('span', { className: 'mc-refreshed' }, ` · ${refreshNote}`) : null,
           )
           : null,
@@ -2076,12 +2082,18 @@ window.__ModuleLoader__.load({
             h(Icon, { name: 'search', className: 'mc-search-icon' }),
             h('input', {
               className: 'mc-input mc-search-input',
-              type: 'search',
+              type: 'text',
               'aria-label': t('search'),
               placeholder: t('searchPlaceholder'),
               value: query,
               spellCheck: false,
               onChange: (event) => setQuery(event.target.value),
+              onKeyDown: (event) => {
+                if (event.key === 'Escape') {
+                  event.stopPropagation()
+                  setQuery('')
+                }
+              },
             }),
             query !== ''
               ? h(
