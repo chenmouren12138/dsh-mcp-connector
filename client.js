@@ -112,6 +112,8 @@ window.__ModuleLoader__.load({
       authNeedValue: '请先填写令牌。',
       authNeedName: '请先填写服务器名，再生成凭据引用。',
       authPlain: '当前为明文值，建议改为凭据引用',
+      advShow: '高级：其他请求头（{count}）',
+      advHide: '收起其他请求头',
       credOk: '已配置（{source}）',
       credMissing: '未配置',
       credUsed: '凭据引用',
@@ -247,6 +249,8 @@ window.__ModuleLoader__.load({
       authNeedValue: 'Enter the token first.',
       authNeedName: 'Enter a server name before generating the credential reference.',
       authPlain: 'Stored as a literal value; prefer a credential reference',
+      advShow: 'Advanced: other headers ({count})',
+      advHide: 'Hide other headers',
       credOk: 'Configured ({source})',
       credMissing: 'Not configured',
       credUsed: 'Credential references',
@@ -535,6 +539,22 @@ window.__ModuleLoader__.load({
       return AUTH_HEADER_LIBRARY[0]
     }
 
+    /**
+     * Header lines other than the auth header. One MCP server carries exactly one
+     * auth header; anything else is an advanced, optional extra.
+     */
+    function countOtherHeaders(text, authName) {
+      const target = String(authName ?? '').toLowerCase()
+      let count = 0
+      for (const line of String(text ?? '').split(/\r?\n/)) {
+        const parsed = splitHeaderLine(line)
+        if (!parsed) continue
+        if (parsed.name.toLowerCase() === target) continue
+        count += 1
+      }
+      return count
+    }
+
     /** Split one argument line, honouring quotes. */
     function splitArgLine(text) {
       const args = []
@@ -760,6 +780,7 @@ window.__ModuleLoader__.load({
       const [authValue, setAuthValue] = useState('')
       const [authVisible, setAuthVisible] = useState(false)
       const [authNote, setAuthNote] = useState('')
+      const [advanced, setAdvanced] = useState(false)
       const nameRef = useRef(null)
       const patch = useCallback((next) => setDraft((current) => ({ ...current, ...next })), [])
 
@@ -769,10 +790,14 @@ window.__ModuleLoader__.load({
         setProbe(null)
         setErrors([])
         setToast('')
-        setAuthHeader(detectAuthHeader(next.headersText))
+        const header = detectAuthHeader(next.headersText)
+        setAuthHeader(header)
         setAuthValue('')
         setAuthVisible(false)
         setAuthNote('')
+        // One auth header per server; only an existing configuration with extra
+        // headers opens the advanced editor, so nothing is silently hidden.
+        setAdvanced(countOtherHeaders(next.headersText, header) > 0)
       }, [server, mode])
 
       useEffect(() => {
@@ -827,6 +852,7 @@ window.__ModuleLoader__.load({
       const boundValue = readHeaderValue(draft.headersText, authHeader)
       const boundRef = credentialRefOf(boundValue)
       const boundStatus = credentialRefs?.find((item) => item.ref === boundRef)
+      const extraHeaderCount = countOtherHeaders(draft.headersText, authHeader)
 
       const transports = allowedTransports.length > 0 ? allowedTransports : ['stdio', 'streamable-http']
 
@@ -986,14 +1012,29 @@ window.__ModuleLoader__.load({
             : null,
           draft.transport !== 'stdio'
             ? h(
-              Field,
-              { label: t('fieldHeaders'), hint: t('fieldHeadersHint'), full: true },
-              h('textarea', {
-                className: 'mc-textarea',
-                value: draft.headersText,
-                spellCheck: false,
-                onChange: (event) => patch({ headersText: event.target.value }),
-              }),
+              'div',
+              { className: 'mc-adv' },
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'mc-btn mc-btn-sm',
+                  'aria-expanded': advanced ? 'true' : 'false',
+                  onClick: () => setAdvanced((value) => !value),
+                },
+                advanced ? t('advHide') : t('advShow', { count: extraHeaderCount }),
+              ),
+              advanced
+                ? h('textarea', {
+                  className: 'mc-textarea',
+                  'aria-label': t('fieldHeaders'),
+                  placeholder: 'X-Tenant: acme',
+                  value: draft.headersText,
+                  spellCheck: false,
+                  onChange: (event) => patch({ headersText: event.target.value }),
+                })
+                : null,
+              advanced ? h('p', { className: 'mc-hint' }, t('fieldHeadersHint')) : null,
             )
             : null,
         ),

@@ -540,6 +540,44 @@ await check('鉴权行：头名只读、令牌掩码、绑定为凭据引用', a
   await flush()
 })
 
+await check('每台 MCP 只有一个鉴权头，其他请求头默认收起', async () => {
+  // A fresh mount: the mini runtime keeps hook state per path, so reopening an
+  // editor at the same path would otherwise inherit the previous draft.
+  root = mount()
+  await flush()
+  byText(root, '添加服务器').props.onClick()
+  await flush()
+  byLabel(root, '传输方式').props.onChange({ target: { value: 'streamable-http' } })
+  rerender()
+  byLabel(root, '服务器名（工具命名空间）').props.onChange({ target: { value: 'single' } })
+  byLabel(root, '端点地址').props.onChange({ target: { value: 'https://example.com/mcp' } })
+  rerender()
+
+  // Exactly one header input: the token field. No free-form headers editor.
+  const tokenFields = findAll(root, (node) => node.type === 'input' && node.props?.['aria-label'] === '令牌')
+  assert.equal(tokenFields.length, 1)
+  assert.equal(findAll(root, (node) => node.type === 'textarea' && node.props?.['aria-label'] === '其他请求头').length, 0)
+
+  // The advanced toggle reports zero extras and reveals the editor on demand.
+  const toggle = byText(root, '高级：其他请求头（0）')
+  assert.ok(toggle, 'advanced toggle')
+  assert.equal(toggle.props['aria-expanded'], 'false')
+  toggle.props.onClick()
+  rerender()
+  const area = findAll(root, (node) => node.type === 'textarea' && node.props?.['aria-label'] === '其他请求头')[0]
+  assert.ok(area, 'advanced headers editor')
+  area.props.onChange({ target: { value: 'X-Tenant: acme' } })
+  rerender()
+  // While open the toggle reads "hide"; collapsing reports the extra header count.
+  byText(root, '收起其他请求头').props.onClick()
+  rerender()
+  assert.match(textOf(root), /高级：其他请求头（1）/)
+
+  const editorPanel = findAll(root, (node) => node.props?.className === 'mc-panel' && node.props?.['aria-label'] === '添加服务器')[0]
+  byText(editorPanel, '取消').props.onClick()
+  await flush()
+})
+
 await check('列表行动作：禁用 / 重试 / 测试 / 删除二次确认', async () => {
   root = mount()
   await flush()
