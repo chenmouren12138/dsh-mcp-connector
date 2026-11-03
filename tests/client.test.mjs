@@ -880,6 +880,29 @@ await check('JSON 容错：wrapper 里放裸配置不被清空', async () => {
   assert.equal(entry.command, 'node', 'command survived')
 })
 
+await check('JSON 别名：VS Code 的 servers + cmd/arguments 也能读', async () => {
+  root = mount()
+  await flush()
+  byText(root, '添加 MCP').props.onClick()
+  await flush()
+  const panelOf = () => findAll(root, (node) => node.props?.className === 'mc-panel mc-editor')[0]
+  const areaOf = () => findAll(panelOf(), (node) => node.type === 'textarea' && node.props?.['aria-label'] === 'JSON')[0]
+  byText(panelOf(), 'JSON').props.onClick()
+  await flush()
+  const doc = '{"servers":{"vscodeDemo":{"cmd":"npx","arguments":["-y","@modelcontextprotocol/server-filesystem","."],"environmentVariables":{"A":"1"},"workdir":"/tmp"}}}'
+  areaOf().props.onChange({ target: { value: doc } })
+  rerender()
+  byText(panelOf(), '一键优化').props.onClick()
+  rerender()
+  const fixed = JSON.parse(areaOf().props.value)
+  const entry = fixed.servers?.vscodeDemo
+  assert.ok(entry, 'server kept under its wrapper')
+  assert.equal(entry.command, 'npx', 'cmd alias mapped to command')
+  assert.deepEqual(entry.args, ['-y', '@modelcontextprotocol/server-filesystem', '.'], 'arguments alias mapped to args')
+  assert.equal(entry.env.A, '1', 'environmentVariables mapped to env')
+  assert.equal(entry.cwd, '/tmp', 'workdir mapped to cwd')
+})
+
 await check('OAuth：卡片上的授权 / 取消授权按钮调用对应动作', async () => {
   snapshot = {
     ...snapshot,

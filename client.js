@@ -1005,17 +1005,44 @@ window.__ModuleLoader__.load({
       return 'stdio'
     }
 
+    /** First present value among the ecosystem's spellings of one field. */
+    function pickField(object, keys) {
+      for (const key of keys) {
+        const value = object?.[key]
+        if (value !== undefined && value !== null) return value
+      }
+      return undefined
+    }
+
+    const FIELD_ALIASES = {
+      command: ['command', 'cmd', 'executable', 'program', 'binary'],
+      args: ['args', 'arguments', 'argv', 'parameters'],
+      env: ['env', 'environment', 'envVars', 'environmentVariables'],
+      cwd: ['cwd', 'workdir', 'workingDirectory', 'dir', 'directory'],
+      url: ['url', 'endpoint', 'baseUrl', 'serverUrl', 'address'],
+      headers: ['headers', 'httpHeaders', 'header'],
+      timeout: ['toolCallTimeoutMs', 'toolCallTimeout', 'timeoutMs', 'timeout', 'callTimeout'],
+    }
+
     function draftOf(server) {
       const config = server.config ?? {}
-      const timeoutMs = typeof config.toolCallTimeoutMs === 'number' ? String(config.toolCallTimeoutMs) : ''
+      const timeoutRaw = pickField(config, FIELD_ALIASES.timeout)
+      const timeoutMs = typeof timeoutRaw === 'number' ? String(timeoutRaw) : (typeof timeoutRaw === 'string' ? timeoutRaw : '')
+      const command = String(pickField(config, FIELD_ALIASES.command) ?? '')
+      const rawArgs = pickField(config, FIELD_ALIASES.args)
+      const args = Array.isArray(rawArgs)
+        ? rawArgs.map((item) => String(item))
+        : typeof rawArgs === 'string' && rawArgs.trim() !== '' ? rawArgs.trim().split(/\s+/) : []
+      const env = pickField(config, FIELD_ALIASES.env)
+      const cwd = String(pickField(config, FIELD_ALIASES.cwd) ?? '')
       if (inferTransport(config) === 'stdio') {
         return {
           serverName: server.serverName,
           transport: 'stdio',
-          command: config.command ?? '',
-          argsText: (config.args ?? []).join('\n'),
-          envText: formatPairLines(config.env, '='),
-          cwd: config.cwd ?? '',
+          command,
+          argsText: args.join('\n'),
+          envText: formatPairLines(env, '='),
+          cwd,
           url: '',
           headersText: '',
           timeoutMs,
@@ -1028,8 +1055,8 @@ window.__ModuleLoader__.load({
         argsText: '',
         envText: '',
         cwd: '',
-        url: config.url ?? '',
-        headersText: formatPairLines(config.headers, ':'),
+        url: String(pickField(config, FIELD_ALIASES.url) ?? ''),
+        headersText: formatPairLines(pickField(config, FIELD_ALIASES.headers), ':'),
         timeoutMs,
       }
     }
