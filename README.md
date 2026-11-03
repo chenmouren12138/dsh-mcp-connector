@@ -45,10 +45,11 @@ DSH 插件：在 Cordis 运行时内实现一个 **MCP Client 能力 Seam**，�
 
 1. **一行摘要**：`N 台服务器 · K 就绪 · M 个工具`。原来四格统计 + 部署策略段（传输白名单/超时/数据目录）已删除——数据目录移到弹窗副标题，策略属于部署配置，不占日常视野。
 2. **工具栏**：搜索框（**按服务器名称实时过滤**：边打边筛，忽略大小写；筛选时列表上方出现「按「x」筛选：N 台匹配」与清除按钮）、**刷新**（图标按钮，悬停显示名称，进行中转圈）、**添加 MCP**。导入 / 导出 JSON 已从界面移除（接口 `POST /dsh-mcp-connector/api` 的 `importJson` / `exportJson` 仍可用）。
-3. **服务器列表**：每张卡片只有 状态徽标 + 名称 + **一行** meta（端点 · 工具数 · 错误摘要）。卡片操作收在一个胶囊动作条里（测试 / 重试 / 启用停用 / 编辑 / 删除），按语义着色：重试用业务色、启停按状态用成功/警示色、删除用危险色；悬浮/聚焦显示自绘提示气泡（非浏览器原生 title：延迟 180ms、深色小胶囊、跟随主题令牌），删除点一次变成「确认 ✓ / 取消 ✕」。停用、连接失败、正在重连时卡片给出提示文字；连接告警（如未下发 Mcp-Session-Id）不再占位。每个操作的回执显示在**该卡片内**并在 4.5 秒后自动消失（删除因为卡片消失，回执显示在页面顶部）。点名称展开详情（协议、能力、统计、最近成功、工具、配置、诊断），详情里可复制工具名 / 配置 / 诊断 JSON。
-4. **添加 / 编辑面板**：页面内嵌（不是浮层弹窗），同一个组件（标题「添加自定义 MCP」/「编辑自定义 MCP」），带「表单」（`表单` / `JSON` 双标签）：
+3. **类型标签**：工具栏下方一排文字标签（`全部` + 实际出现的类型，数量在小字右上角；默认选中「全部」），按用途而不是传输方式分组——`原型`（Figma / Pixso / MasterGo / 墨刀 …）、`设计`、`文档`、`代码`、`数据`、`浏览器`、`其他`。类型由名称 / 地址 / 工具名推断，编辑面板里的「类型」可以手动固定；标签与搜索可叠加。
+4. **服务器列表**：列表在独立滚动容器里滚动，标题 / 工具栏 / 类型标签固定不动。每张卡片只有 状态徽标 + 名称 + **一行** meta（端点 · 工具数 · 错误摘要）。卡片操作收在一个胶囊动作条里（重试 / 启用停用 / 编辑 / 删除；**测试连接只在编辑面板里**，保存后的行不再挂着测试按钮），按语义着色：重试用业务色、启停按状态用成功/警示色、删除用危险色；悬浮/聚焦显示自绘提示气泡（非浏览器原生 title：延迟 180ms、深色小胶囊、跟随主题令牌），删除点一次变成「确认 ✓ / 取消 ✕」。停用、连接失败、正在重连时卡片给出提示文字；连接告警（如未下发 Mcp-Session-Id）不再占位。每个操作的回执显示在**该卡片内**并在 4.5 秒后自动消失（删除因为卡片消失，回执显示在页面顶部）。点名称展开详情（协议、能力、统计、最近成功、工具、配置、诊断），详情里可复制工具名 / 配置 / 诊断 JSON。
+5. **添加 / 编辑面板**：页面内嵌（不是浮层弹窗，且跟随被编辑的那张卡片），同一个组件（标题「添加自定义 MCP」/「编辑自定义 MCP」），带「表单」（`表单` / `JSON` 双标签）：
 
-   - **表单**：MCP 名称（命名空间；编辑时锁定并提示「Agent 将看到 serverName」）、传输类型（自绘下拉：胶囊触发器 + 选项列表，与 DSH 其它选择器同款，键盘 ↑/↓/Enter/Esc 可用）、超时时间（毫秒，可选）、服务地址（HTTP）或命令 / 参数 / 环境变量 / 工作目录（stdio）、请求头行列表。新建默认 **Streamable HTTP**；「测试连接」与「保存 MCP」都会校验必填项，缺项时控件显示红色边框并在下方用 12.5px 小字说明必填原因（首次提交后才开始标红，避免一打开就满屏红）。
+   - **表单**：MCP 名称（**不限制格式**，中文 / 空格 / 括号都可以；工具前缀会自动转换为 `[a-z0-9_-]`，输入时下方实时预览「工具名前缀将是「xxx」」，卡片与搜索仍用你输入的名称；编辑时同样可改名，保存后按新前缀重新注册工具）、传输类型（自绘下拉：胶囊触发器 + 选项列表，与 DSH 其它选择器同款，键盘 ↑/↓/Enter/Esc 可用）、超时时间（毫秒，可选）、服务地址（HTTP）或命令 / 参数 / 环境变量 / 工作目录（stdio）、请求头行列表。新建默认 **Streamable HTTP**；「测试连接」与「保存 MCP」都会校验必填项，缺项时控件显示红色边框并在下方用 12.5px 小字说明必填原因（首次提交后才开始标红，避免一打开就满屏红）。
    - **请求头行**：`+ 添加 Header` 新增一行（Header 名称 / 值 / 删除）。值**默认掩码**，点行尾的眼睛显示完整内容、再点隐藏；行尾垃圾桶删除该行。请求头值作为连接参数保存在注册表里，页面按需读取后默认隐藏展示。保存时若某行仍是掩码占位符（`••••`）会被拦下，提示重新输入——旧版本曾把掩码写回注册表，HTTP 传输还会因此抛出难以理解的 ByteString 错误。
    - **不再提供「存为凭据」按钮**：需要把密钥移出配置文件时，仍可在 JSON 标签或导入 JSON 里写 `${credential:REF}`（见「凭据与密钥」），宿主照常解析。
    - **JSON**：直接编辑该服务器的 JSON，支持生态里的常见写法——`{"mcpServers":{"<名>":{…}}}`（Claude Desktop / Figma 文档）、`{"servers":{…}}`（VS Code）、`{"<名>":{…}}`、以及裸配置 `{ "command": … }`；保存时按原样保留外层包裹，不会把 `mcpServers` 挤成服务器名。切换回表单会应用能解析的内容，非法 JSON 就地报错且不覆盖草稿。编辑器带语法着色，右上角「一键优化」会**先尝试修复**常见错误（单引号 / 智能引号、`//` 与 `/* */` 注释、未加引号的键、裸词、尾逗号、全角标点、BOM），修复成功提示「已修复 N 处并整理为标准格式」；完全无法修复时在按钮旁给出解析原因。文档里有多台服务器时只编辑第一台，并在下方提示数量。
@@ -124,7 +125,7 @@ DSH 插件：在 Cordis 运行时内实现一个 **MCP Client 能力 Seam**，�
 ## 数据与状态
 
 - 注册表落在 `<DSH_HOME>/mcp-connector/registry.json`（可用 `registry.dataDir` 覆盖），单文件、带 `version`、原子写（临时文件 + rename）。损坏的文件不删除，另存 `registry.corrupt-<ts>.json` 供人工恢复。
-- 记录形如 `{ id, serverName, disabled, config, source, createdAt, updatedAt }`；`serverName` 是工具名前缀，生命周期内不可变，改名走「删除后重建」。
+- 记录形如 `{ id, serverName, displayName?, disabled, config, source, createdAt, updatedAt }`；`serverName` 是工具名前缀（ASCII），`displayName` 保存用户输入的原名。改名会先释放旧前缀的工具再按新前缀注册；名字冲突直接拒绝。
 - **状态是运行期产物**，不写盘：`lastSuccessAt`、`lastError`、重连计数、调用计数都在内存里，重载即重新探测。
 - 默认不做心跳；`probeIntervalMs > 0` 可开启周期探测。断线按指数退避重连（`reconnect`），次数用尽后停在 `error` 并要求手动重试。
 
@@ -141,10 +142,10 @@ DSH 插件：在 Cordis 运行时内实现一个 **MCP Client 能力 Seam**，�
 ```
 
 - 落盘、导出、界面展示、诊断都是以 `${credential:EXAMPLE_TOKEN}` 这个占位符出现，**不是明文**；
-- 每次连接/探测时才解析：先问 DSH 凭据服务（`ctx.credentials.resolve`），再退回同名环境变量；
+- 每次连接/探测时才解析：先问 DSH 凭据服务（`ctx.credentials.resolve`），再读本地 `credentials.json`，最后退回同名环境变量；
 - 轮换令牌只改凭据，连接下一次重连或「测试连接」即生效，**不改配置文件、不重启**；
 - 引用解析不到时返回结构化诊断 `CREDENTIAL_MISSING`（`phase: config`），列出缺哪些引用，而不是一个莫名的 401；
-- 部署没有凭据服务时 `CREDENTIAL_UNAVAILABLE`，提示改用同名环境变量。
+- 部署的凭据服务若是内存态（重启即丢），写凭据时同时落盘到 `<dataDir>/credentials.json`（原子写、POSIX 0600），所以重启后仍能解析；`unsetCredential` 会同时清两处。
 
 存凭据两条路：
 
@@ -167,7 +168,7 @@ DSH 插件：在 Cordis 运行时内实现一个 **MCP Client 能力 Seam**，�
 - stdio：`command` / `cmd` / `executable`，`args` / `arguments` / `argv`（数组或一行带引号的命令串），`env` / `environment` / `envVars`，`cwd`；
 - HTTP：`url` / `endpoint` / `baseUrl`，`headers` / `httpHeaders`。
 
-`serverName` 必须匹配 `[A-Za-z0-9_-]{1,32}`；导入内重复、与现有条目冲突都会逐条报错。**只要有任意一行未通过校验，本次一条都不写入**，返回 `rejected[]` 让界面逐行展示。
+`serverName` 不再限制字符：友好名会被转成工具前缀并保留为 `displayName`；导入内重复、与现有条目冲突都会逐条报错。**只要有任意一行未通过校验，本次一条都不写入**，返回 `rejected[]` 让界面逐行展示。
 
 写入方式两种：`merge` 按名字 upsert；`replace` 全量覆盖——新增、更新、删除在一次写入里原子完成。导出支持 `{"mcpServers": {…}}`（默认）、裸 map、对象数组。
 
@@ -179,7 +180,7 @@ DSH 插件：在 Cordis 运行时内实现一个 **MCP Client 能力 Seam**，�
 2. **注册**：有 `registration_endpoint` 就走动态客户端注册（RFC 7591），注册成 `token_endpoint_auth_method=none` 的公共客户端；
 3. **授权**：授权码 + PKCE(S256) + `state` + `resource`（RFC 8707）；回调监听只绑 `127.0.0.1` 的临时端口，授权完自动关闭；
 4. **换票与续期**：`expires_in` 到期前 60 秒自动用 refresh token 换新；换票失败会把状态置为需要重新授权；
-5. **落库**：access / refresh / 元数据写进 DSH 凭据库（`MCP_OAUTH_<服务器>_ACCESS` / `_REFRESH` / `_META`），`registry.json` 里只有引用，界面和诊断都看不到 token。
+5. **落库**：access / refresh / 元数据写进 DSH 凭据库（`MCP_OAUTH_<服务器>_ACCESS` / `_REFRESH` / `_META`，并镜像到本地 `credentials.json` 以便重启后继续用），`registry.json` 里只有引用，界面和诊断都看不到 token。
 
 **界面**：每张 HTTP 服务器卡片上有一个盾牌图标——
 
@@ -195,7 +196,7 @@ DSH 插件：在 Cordis 运行时内实现一个 **MCP Client 能力 Seam**，�
 | 端点 | 内容 |
 |---|---|
 | `GET /dsh-mcp-connector/api` | 完整快照：部署策略、每台服务器的状态/诊断/工具/统计 |
-| `POST /dsh-mcp-connector/api` | `{ action, payload }`，动作：`addServer` `updateServer` `removeServer` `setDisabled` `retryServer` `refreshServer` `testConnection` `importJson` `exportJson` `health` |
+| `POST /dsh-mcp-connector/api` | `{ action, payload }`，动作：`addServer` `updateServer` `removeServer` `setDisabled` `retryServer` `refreshServer` `testConnection` `importJson` `exportJson` `credentialStatus` `setCredential` `unsetCredential` `health` |
 | `GET /dsh-mcp-connector/health` | 健康摘要：`ok`、各状态计数、工具数、调用数/失败数、运行时长 |
 | `GET /dsh-mcp-connector/config` | 部署策略（传输白名单、超时、注册表位置） |
 

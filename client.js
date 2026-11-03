@@ -44,13 +44,10 @@ window.__ModuleLoader__.load({
       oauthPending: '等待浏览器完成授权…',
       oauthAuthorized: '已授权',
       oauthFailed: '授权失败：{message}',
-      testOkShort: '连接有效',
       probeOkShort: '连接有效 · {count} 个工具 · {ms}ms',
       probeFailShort: '连接失败：{code} · {message}',
 
-      testFailedShort: '测试未通过',
       hintAuth: '需要鉴权：在「编辑」里加请求头（如 Figma 用 X-Figma-Token），或点「授权」走 OAuth（当前 401）。',
-      oauthUnsupported: '该服务器不支持 OAuth 授权',
       copyTools: '复制工具名',
       copyConfig: '复制配置',
       copyDiagnostic: '复制诊断',
@@ -195,13 +192,10 @@ window.__ModuleLoader__.load({
       oauthPending: 'Waiting for the browser to finish…',
       oauthAuthorized: 'Authorized',
       oauthFailed: 'Authorization failed: {message}',
-      testOkShort: 'Connected',
       probeOkShort: 'Connected · {count} tools · {ms}ms',
       probeFailShort: 'Connection failed: {code} · {message}',
 
-      testFailedShort: 'Test failed',
       hintAuth: 'Authentication needed: add a header in 编辑 (Figma uses X-Figma-Token), or press 授权 for OAuth (401).',
-      oauthUnsupported: 'This server does not support OAuth',
       copyTools: 'Copy tool names',
       copyConfig: 'Copy config',
       copyDiagnostic: 'Copy diagnostic',
@@ -464,7 +458,6 @@ window.__ModuleLoader__.load({
       'border:.5px solid var(--dsw-alias-border-l2);border-radius:999px;background:var(--dsw-alias-bg-layer-2)}',
       '.mc-actions .mc-icon-btn{width:26px;height:26px;border-radius:999px}',
       '.mc-actions .mc-icon-btn:hover:not(:disabled){background:var(--dsw-alias-bg-layer-3)}',
-      '.mc-act-test{color:var(--dsw-alias-label-secondary)}',
       '.mc-act-retry{color:var(--dsw-alias-state-business-primary)}',
       '.mc-act-power{color:var(--dsw-alias-label-secondary)}',
       '.mc-act-power[data-tone="off"]{color:var(--dsw-alias-state-warning-primary,var(--dsw-alias-label-secondary))}',
@@ -725,19 +718,13 @@ window.__ModuleLoader__.load({
       plus: 'M12 5v14M5 12h14',
       close: 'M6 6l12 12M18 6L6 18',
       search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm5.2-.8L21 21',
-      key: 'M14 7a4 4 0 1 1-3.1 6.5L8 16.4V19H5v-3l4.6-4.6A4 4 0 0 1 14 7Zm1 2h.01',
       trash: 'M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13M10 11v6M14 11v6',
       retry: 'M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5',
       caret: 'M9 6l6 6-6 6',
-      more: 'M6 12h.01M12 12h.01M18 12h.01',
       check: 'M5 13l4 4L19 7',
       reload: 'M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5',
-      warning: 'M12 4l9 16H3L12 4Zm0 6v5m0 3h.01',
-      eye: 'M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Zm10 2.6a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2Z',
-      plug: 'M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0V8ZM12 17v4',
       power: 'M12 3v9M6.6 6.6a8 8 0 1 0 11 0',
       pencil: 'M4 20h4L19 9l-4-4L4 16v4Zm10-14 4 4',
-      eyeOff: 'M3 3l18 18M10.6 6.1A10.6 10.6 0 0 1 12 6c6.4 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.2 7.4A17.4 17.4 0 0 0 2 12s3.6 6 10 6a10.4 10.4 0 0 0 4-.8',
     }
 
     function Icon({ name, size = 16, className, title }) {
@@ -1184,10 +1171,6 @@ window.__ModuleLoader__.load({
       }
     }
 
-    function firstProblem(fields) {
-      return Object.values(fields).find(Boolean) ?? ''
-    }
-
     function draftToConfig(draft) {
       const timeout = Number(draft.timeoutMs)
       const timeoutField = Number.isFinite(timeout) && timeout >= 1000 ? { toolCallTimeoutMs: timeout } : {}
@@ -1321,17 +1304,6 @@ window.__ModuleLoader__.load({
     }
 
     /** Backwards-compatible helper: just the draft. */
-    function entryToDraft(input, preferredName) {
-      return readEntryDocument(input, preferredName).draft
-    }
-
-    function validateDraft(draft, t) {
-      const errors = []
-      if (draft.serverName.trim() === '') errors.push(t('requiredName'))
-      if (draft.transport === 'stdio' && draft.command.trim() === '') errors.push(t('requiredCommand'))
-      if (draft.transport !== 'stdio' && draft.url.trim() === '') errors.push(t('requiredUrl'))
-      return errors
-    }
 
     /**
      * A picker drawn with the shell's own vocabulary: bordered trigger plus a menu.
