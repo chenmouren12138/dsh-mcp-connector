@@ -68,6 +68,10 @@ window.__ModuleLoader__.load({
       disable: '禁用',
       test: '测试连接',
       retry: '重试连接',
+      retrying: '重试中…',
+      hintDisabled: '已停用：不会建立连接，工具对模型不可见；点「启用」即可恢复。',
+      hintError: '连接失败，可点「重试连接」再试一次。',
+      hintReconnecting: '连接断开，正在自动重连…',
       expand: '详情',
       collapse: '收起',
       details: '诊断与工具',
@@ -236,6 +240,10 @@ window.__ModuleLoader__.load({
       disable: 'Disable',
       test: 'Test connection',
       retry: 'Retry',
+      retrying: 'Retrying…',
+      hintDisabled: 'Disabled: not connected and its tools are hidden; press Enable to bring it back.',
+      hintError: 'Connection failed; press Retry to try again.',
+      hintReconnecting: 'Connection dropped; reconnecting…',
       expand: 'Details',
       collapse: 'Hide',
       details: 'Diagnostics and tools',
@@ -1680,6 +1688,26 @@ window.__ModuleLoader__.load({
             {
               type: 'button',
               className: 'mc-btn mc-btn-sm',
+              disabled: busy !== '' || server.disabled,
+              onClick: () => onAction('retry', server),
+            },
+            busy === 'retry' ? t('retrying') : t('retry'),
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'mc-btn mc-btn-sm',
+              disabled: busy !== '',
+              onClick: () => onAction(server.disabled ? 'enable' : 'disable', server),
+            },
+            server.disabled ? t('enable') : t('disable'),
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'mc-btn mc-btn-sm',
               disabled: busy !== '',
               onClick: () => onAction('edit', server),
             },
@@ -1708,6 +1736,13 @@ window.__ModuleLoader__.load({
           server.toolCount > 0 ? ` · ${t('toolsCount', { count: server.toolCount })}` : null,
           error ? h('span', { className: 'mc-err' }, ` · ${error.code}：${error.message}`) : null,
         ),
+        server.disabled
+          ? h('p', { className: 'mc-hint' }, t('hintDisabled'))
+          : server.state === 'error'
+            ? h('p', { className: 'mc-hint mc-err' }, t('hintError'))
+            : server.state === 'reconnecting'
+              ? h('p', { className: 'mc-hint' }, t('hintReconnecting'))
+              : null,
         Array.isArray(server.notes) && server.notes.length > 0
           ? h('p', { className: 'mc-hint' }, server.notes.join('；'))
           : null,
@@ -1715,26 +1750,6 @@ window.__ModuleLoader__.load({
           ? h(
             'div',
             { className: 'mc-more' },
-            h(
-              'button',
-              {
-                type: 'button',
-                className: 'mc-btn mc-btn-sm',
-                disabled: busy !== '' || server.disabled,
-                onClick: () => onAction('retry', server),
-              },
-              t('retry'),
-            ),
-            h(
-              'button',
-              {
-                type: 'button',
-                className: 'mc-btn mc-btn-sm',
-                disabled: busy !== '',
-                onClick: () => onAction(server.disabled ? 'enable' : 'disable', server),
-              },
-              server.disabled ? t('enable') : t('disable'),
-            ),
             confirming
               ? [
                 h(

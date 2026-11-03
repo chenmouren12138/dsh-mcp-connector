@@ -623,20 +623,19 @@ await check('列表行动作：禁用 / 重试 / 测试 / 删除二次确认', a
   root = mount()
   await flush()
 
-  // Row surface: test + edit stay visible; the rest lives behind the row's
-  // overflow menu (the toolbar has its own menu with import/export/refresh).
+  // Per-card actions: test, retry, enable/disable and edit are visible on the
+  // row itself; only delete stays behind the overflow menu.
   const rowList = () => findAll(root, (node) => node.props?.className === 'mc-list')[0]
   assert.ok(byText(root, '测试连接'), 'test stays visible')
+  assert.ok(byText(root, '重试连接'), 'retry stays visible')
   assert.ok(byText(root, '编辑'), 'edit stays visible')
-  assert.equal(byText(root, '禁用'), undefined, 'destructive actions are collapsed')
-
-  byAria(rowList(), '更多操作').props.onClick()
-  rerender()
   const disable = byText(root, '禁用')
-  assert.ok(disable, 'disable inside overflow menu')
+  assert.ok(disable, 'disable is visible per card')
+  assert.equal(byText(root, '删除'), undefined, 'delete is still collapsed')
   disable.props.onClick()
   await flush()
   assert.ok(calls.some((item) => item.action === 'setDisabled' && item.payload.disabled === true))
+  assert.match(textOf(root), /已停用：/, 'disabled hint appears on the card')
 
   const test = byText(findAll(root, (node) => node.props?.className === 'mc-list')[0], '测试连接')
   test.props.onClick()
@@ -644,8 +643,9 @@ await check('列表行动作：禁用 / 重试 / 测试 / 删除二次确认', a
   assert.ok(calls.some((item) => item.action === 'testConnection' && item.payload.id === 'srv-new'))
   assert.match(textOf(root), /连接有效|2025-06-18/)
 
-  // The overflow menu stays open through an action, so the delete entry is still
-  // reachable without reopening it.
+  // Delete lives in the overflow menu, behind a second confirmation.
+  byAria(rowList(), '更多操作').props.onClick()
+  rerender()
   const remove = byText(root, '删除')
   remove.props.onClick()
   await flush()
