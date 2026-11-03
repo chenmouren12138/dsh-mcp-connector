@@ -44,6 +44,9 @@ window.__ModuleLoader__.load({
       oauthPending: '等待浏览器完成授权…',
       oauthAuthorized: '已授权',
       oauthFailed: '授权失败：{message}',
+      testOkShort: '连接有效',
+      testFailedShort: '测试未通过',
+      hintAuth: '需要鉴权：点「授权」走 OAuth，或在「编辑」里配置请求头（当前错误码 HTTP_AUTH）。',
       oauthUnsupported: '该服务器不支持 OAuth 授权',
       copyTools: '复制工具名',
       copyConfig: '复制配置',
@@ -164,6 +167,9 @@ window.__ModuleLoader__.load({
       oauthPending: 'Waiting for the browser to finish…',
       oauthAuthorized: 'Authorized',
       oauthFailed: 'Authorization failed: {message}',
+      testOkShort: 'Connected',
+      testFailedShort: 'Test failed',
+      hintAuth: 'Authentication needed: press 授权 for OAuth, or add a header in 编辑 (HTTP_AUTH).',
       oauthUnsupported: 'This server does not support OAuth',
       copyTools: 'Copy tool names',
       copyConfig: 'Copy config',
@@ -2078,6 +2084,12 @@ window.__ModuleLoader__.load({
             : server.oauth?.status === 'error'
               ? h('p', { className: 'mc-hint mc-err' }, t('oauthFailed', { message: server.oauth.error?.message ?? '' }))
               : null,
+        busy === 'test'
+          ? h('p', { className: 'mc-hint' }, t('testing'))
+          : null,
+        server.state === 'error' && server.lastError?.code === 'HTTP_AUTH' && !server.oauth?.authorized
+          ? h('p', { className: 'mc-hint mc-err' }, t('hintAuth'))
+          : null,
         server.disabled
           ? h('p', { className: 'mc-hint' }, t('hintDisabled'))
           : server.state === 'error'
@@ -2325,6 +2337,19 @@ window.__ModuleLoader__.load({
           if (action === 'test') {
             const report = await request('testConnection', { id: server.id })
             setProbeReport({ for: server.serverName, report })
+            if (report?.ok === false || report?.error) {
+              const detail = report?.error ?? {}
+              showFeedback(server.id, {
+                kind: 'error',
+                message: `${t('testFailedShort')}：${detail.code ?? 'ACTION_FAILED'} · ${detail.message ?? ''}`,
+              })
+            } else {
+              const count = Array.isArray(report?.tools) ? report.tools.length : 0
+              showFeedback(server.id, {
+                kind: 'ok',
+                message: `${t('testOkShort')} · ${t('toolsCount', { count })}`,
+              })
+            }
             return
           }
           let message = ''

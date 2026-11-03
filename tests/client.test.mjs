@@ -665,6 +665,7 @@ await check('列表行动作：禁用 / 重试 / 测试 / 删除二次确认', a
   await flush()
   assert.ok(calls.some((item) => item.action === 'testConnection' && item.payload.id === 'srv-new'))
   assert.match(textOf(root), /连接有效|2025-06-18/)
+  assert.match(textOf(probeCard()), /连接有效/, 'the card reports its own test result')
 
   // Delete asks for confirmation with check / cancel icons.
   byAria(probeCard(), '删除').props.onClick()
@@ -921,6 +922,8 @@ await check('OAuth：卡片上的授权 / 取消授权按钮调用对应动作',
   const cardText = textOf(httpCard())
   assert.ok(cardText.indexOf('2 个工具') >= 0, 'tools tag rendered')
   assert.ok(cardText.indexOf('2 个工具') < cardText.indexOf('授权'), 'authorize pill follows the tools tag')
+
+  assert.match(textOf(httpCard()), /需要鉴权/, 'auth failure explains the fix')
 
   const authorize = byText(httpCard(), '授权')
   assert.ok(authorize, 'authorize tag button on http servers')
