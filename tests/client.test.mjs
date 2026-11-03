@@ -704,42 +704,6 @@ await check('编辑弹窗与添加弹窗同构：标题、名称锁定、动作�
   await flush()
 })
 
-await check('导入面板：逐条校验失败原样展示', async () => {
-  byAria(findAll(root, (node) => node.props?.className === 'mc-toolbar')[0], '更多操作').props.onClick()
-  rerender()
-  const importButton = byText(root, '导入 JSON')
-  importButton.props.onClick()
-  await flush()
-  const area = byPlaceholder(root, '{"mcpServers": {"filesystem": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]}}}')
-  assert.ok(area, 'import textarea')
-  area.props.onChange({ target: { value: '{"mcpServers": {"bad name!": {"command": "x"}}}' } })
-  rerender()
-  const run = byText(root, '校验并导入')
-  run.props.onClick()
-  await flush()
-  const text = textOf(root)
-  assert.match(text, /1 条未通过校验/)
-  assert.match(text, /SERVER_NAME_INVALID/)
-  assert.match(text, /bad name!/)
-})
-
-await check('导出面板生成所选结构', async () => {
-  byAria(findAll(root, (node) => node.props?.className === 'mc-toolbar')[0], '更多操作').props.onClick()
-  rerender()
-  const exportButton = byText(root, '导出 JSON')
-  exportButton.props.onClick()
-  await flush()
-  const generate = byText(root, '生成')
-  generate.props.onClick()
-  await flush()
-  const call = calls.find((item) => item.action === 'exportJson')
-  assert.ok(call)
-  assert.equal(call.payload.format, 'mcpServers')
-  const area = findAll(root, (node) => node.type === 'textarea' && node.props?.readOnly === true)[0]
-  assert.ok(area, 'export textarea')
-  assert.match(area.props.value, /mcpServers/)
-})
-
 const failed = results.filter((item) => !item.ok)
 for (const item of results) {
   console.log(`${item.ok ? 'PASS' : 'FAIL'}  ${item.name}`)

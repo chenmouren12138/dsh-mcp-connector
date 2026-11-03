@@ -662,93 +662,11 @@ window.__ModuleLoader__.load({
         .join('\n')
     }
 
-    /** Header names the auth row can bind; the library is fixed, not free text. */
-    const AUTH_HEADER_LIBRARY = ['modao-token', 'Authorization', 'X-Api-Key', 'X-Auth-Token']
-
     /** One line's `KEY: VALUE` split, or undefined. */
     function splitHeaderLine(line) {
       const index = line.indexOf(':')
       if (index <= 0) return undefined
       return { name: line.slice(0, index).trim(), value: line.slice(index + 1).trim() }
-    }
-
-    /** Read one header value out of the textarea text (case-insensitive name). */
-    function readHeaderValue(text, name) {
-      const target = name.toLowerCase()
-      for (const line of String(text ?? '').split(/\r?\n/)) {
-        const parsed = splitHeaderLine(line)
-        if (parsed && parsed.name.toLowerCase() === target) return parsed.value
-      }
-      return undefined
-    }
-
-    /** Replace (or insert) one header line, preserving every other line. */
-    function writeHeaderValue(text, name, value) {
-      const target = name.toLowerCase()
-      const lines = String(text ?? '').split(/\r?\n/).filter((line) => line.trim() !== '')
-      const output = []
-      let replaced = false
-      for (const line of lines) {
-        const parsed = splitHeaderLine(line)
-        if (parsed && parsed.name.toLowerCase() === target) {
-          if (!replaced) output.push(`${name}: ${value}`)
-          replaced = true
-          continue
-        }
-        output.push(line)
-      }
-      if (!replaced) output.push(`${name}: ${value}`)
-      return output.join('\n')
-    }
-
-    /** The `${credential:REF}` reference a header value holds, if any. */
-    function credentialRefOf(value) {
-      const match = /^\$\{credential:([A-Za-z0-9_.:-]{1,64})\}$/.exec(String(value ?? '').trim())
-      return match ? match[1] : undefined
-    }
-
-    /** Drop one header line (name compared case-insensitively). */
-    function removeHeaderValue(text, name) {
-      const target = name.toLowerCase()
-      return String(text ?? '')
-        .split(/\r?\n/)
-        .filter((line) => {
-          const parsed = splitHeaderLine(line)
-          return !(parsed && parsed.name.toLowerCase() === target)
-        })
-        .filter((line) => line.trim() !== '')
-        .join('\n')
-    }
-
-    /** Deterministic reference name for one server's auth header. */
-    function credentialRefName(serverName, header) {
-      const name = String(serverName ?? '').trim().replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').toUpperCase()
-      const field = String(header).replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').toUpperCase()
-      return `MCP_${name || 'SERVER'}_${field || 'TOKEN'}`.slice(0, 64)
-    }
-
-    /** Which auth header the current text seems to use. */
-    function detectAuthHeader(text) {
-      for (const name of AUTH_HEADER_LIBRARY) {
-        if (readHeaderValue(text, name) !== undefined) return name
-      }
-      return AUTH_HEADER_LIBRARY[0]
-    }
-
-    /**
-     * Header lines other than the auth header. One MCP server carries exactly one
-     * auth header; anything else is an advanced, optional extra.
-     */
-    function countOtherHeaders(text, authName) {
-      const target = String(authName ?? '').toLowerCase()
-      let count = 0
-      for (const line of String(text ?? '').split(/\r?\n/)) {
-        const parsed = splitHeaderLine(line)
-        if (!parsed) continue
-        if (parsed.name.toLowerCase() === target) continue
-        count += 1
-      }
-      return count
     }
 
     /** Split one argument line, honouring quotes. */
@@ -907,6 +825,31 @@ window.__ModuleLoader__.load({
         h('span', { className: 'mc-tip', role: 'tooltip' }, label),
       )
     }
+
+    /**
+     * Keep a render crash visible. Without this, one bad node unmounts the whole
+     * section and every control silently stops responding. The test runtime has no
+     * class support, so it degrades to a pass-through there.
+     */
+    const Boundary = typeof React.Component === 'function'
+      ? class Boundary extends React.Component {
+        constructor(props) {
+          super(props)
+          this.state = { error: '' }
+        }
+
+        static getDerivedStateFromError(error) {
+          return { error: error?.message ?? String(error) }
+        }
+
+        render() {
+          if (this.state.error) {
+            return h('p', { className: 'mc-note mc-note-error', role: 'alert' }, '界面渲染失败：' + this.state.error)
+          }
+          return this.props.children ?? null
+        }
+      }
+      : (props) => props.children ?? null
 
     function StateBadge({ state, label }) {
       return h(
@@ -1180,6 +1123,7 @@ window.__ModuleLoader__.load({
       const [draft, setDraft] = useState(() => (server ? draftOf(server) : { ...EMPTY_DRAFT }))
       const [tab, setTab] = useState('form')
       const [busy, setBusy] = useState('')
+      const [status, setStatus] = useState('')
       const [errors, setErrors] = useState([])
       const [probe, setProbe] = useState(null)
       const [toast, setToast] = useState('')
@@ -1249,6 +1193,7 @@ window.__ModuleLoader__.load({
           return
         }
         setErrors([])
+        setStatus(t('testing'))
         setBusy('probe')
         setProbe(null)
         try {
@@ -1265,6 +1210,7 @@ window.__ModuleLoader__.load({
             },
           })
         } finally {
+          setStatus('')
           setBusy('')
         }
       }, [buildPayload, draft, t])
@@ -1275,6 +1221,7 @@ window.__ModuleLoader__.load({
           return
         }
         setErrors([])
+        setStatus(t('saving'))
         setBusy('save')
         setToast('')
         try {
@@ -1287,6 +1234,7 @@ window.__ModuleLoader__.load({
         } catch (error) {
           setErrors([`${error.code ?? 'ACTION_FAILED'} · ${error.phase ?? 'config'} · ${error.message}`])
         } finally {
+          setStatus('')
           setBusy('')
         }
       }, [buildPayload, draft, mode, onSaved, server, t])
@@ -1533,7 +1481,7 @@ window.__ModuleLoader__.load({
                     ),
                     rows.map((row, index) => h(
                       'div',
-                      { className: 'mc-header-row', key: `${index}-${row.name}` },
+                      { className: 'mc-header-row', key: index },
                       h('input', {
                         className: 'mc-input',
                         'aria-label': t('headerName'),
@@ -1590,6 +1538,7 @@ window.__ModuleLoader__.load({
               busy === 'probe' ? t('testing') : t('testDraft'),
             ),
             h('span', { className: 'mc-toolbar-spacer' }),
+            status ? h('span', { className: 'mc-hint', role: 'status' }, status) : null,
             h('button', { type: 'button', className: 'mc-btn', onClick: onCancel }, t('cancel')),
             h(
               'button',
@@ -1881,190 +1830,18 @@ window.__ModuleLoader__.load({
 
     // ── import / export panels ────────────────────────────────────────────────
 
-    function ImportPanel({ t, onDone, onClose }) {
-      const [text, setText] = useState('')
-      const [mode, setMode] = useState('merge')
-      const [busy, setBusy] = useState(false)
-      const [result, setResult] = useState(null)
-      const [error, setError] = useState('')
-
-      const run = useCallback(async () => {
-        if (text.trim() === '') {
-          setError(t('importEmpty'))
-          return
-        }
-        setBusy(true)
-        setError('')
-        setResult(null)
-        try {
-          const data = await request('importJson', { text, mode })
-          setResult(data)
-          onDone?.(data)
-        } catch (failure) {
-          const detail = failure.detail
-          if (detail && Array.isArray(detail.rejected)) {
-            setResult({ ok: false, ...detail })
-          } else {
-            setError(`${failure.code ?? 'ACTION_FAILED'} · ${failure.phase ?? 'config'} · ${failure.message}`)
-          }
-        } finally {
-          setBusy(false)
-        }
-      }, [mode, onDone, t, text])
-
-      return h(
-        'section',
-        { className: 'mc-panel', 'aria-label': t('importTitle') },
-        h(
-          'div',
-          { className: 'mc-panel-head' },
-          h('h3', { className: 'mc-panel-title' }, t('importTitle')),
-          h('button', { type: 'button', className: 'mc-btn mc-btn-sm', onClick: onClose }, t('close')),
-        ),
-        h('p', { className: 'mc-hint' }, t('importHint')),
-        h('textarea', {
-          className: 'mc-textarea',
-          style: { minHeight: '150px' },
-          value: text,
-          spellCheck: false,
-          placeholder: '{"mcpServers": {"filesystem": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]}}}',
-          onChange: (event) => setText(event.target.value),
-        }),
-        h(
-          'div',
-          { className: 'mc-radio', role: 'radiogroup', 'aria-label': t('importMode') },
-          h(
-            'label',
-            null,
-            h('input', { type: 'radio', name: 'mc-import-mode', checked: mode === 'merge', onChange: () => setMode('merge') }),
-            t('importMerge'),
-          ),
-          h(
-            'label',
-            null,
-            h('input', { type: 'radio', name: 'mc-import-mode', checked: mode === 'replace', onChange: () => setMode('replace') }),
-            t('importReplace'),
-          ),
-        ),
-        error ? h(Note, { kind: 'error' }, error) : null,
-        result
-          ? h(
-            'div',
-            null,
-            result.ok === false
-              ? h(Note, { kind: 'error' }, t('importRejected', { count: result.rejected?.length ?? 0 }))
-              : h(Note, { kind: 'ok' }, t('importDone', { message: result.receipt?.message ?? '' })),
-            Array.isArray(result.accepted) && result.accepted.length > 0
-              ? h('p', { className: 'mc-hint' }, t('importAccepted', { names: result.accepted.join('、') }))
-              : null,
-            Array.isArray(result.rejected) && result.rejected.length > 0
-              ? h(
-                'ul',
-                { className: 'mc-list-plain' },
-                result.rejected.map((row, index) => h(
-                  'li',
-                  { key: `${row.index}-${index}`, className: 'mc-err' },
-                  t('rejectedRow', {
-                    index: (row.index ?? index) + 1,
-                    name: row.name ?? '—',
-                    code: row.code,
-                    message: row.message,
-                  }),
-                )),
-              )
-              : null,
-          )
-          : null,
-        h(
-          'div',
-          { className: 'mc-footer' },
-          h(
-            'button',
-            { type: 'button', className: 'mc-btn mc-btn-primary', disabled: busy, onClick: run },
-            busy ? t('importRunning') : t('importRun'),
-          ),
-        ),
-      )
-    }
-
-    function ExportPanel({ t, onClose }) {
-      const [format, setFormat] = useState('mcpServers')
-      const [text, setText] = useState('')
-      const [copied, setCopied] = useState(false)
-      const [busy, setBusy] = useState(false)
-      const [error, setError] = useState('')
-
-      const run = useCallback(async () => {
-        setBusy(true)
-        setError('')
-        try {
-          const data = await request('exportJson', { format })
-          setText(JSON.stringify(data.document, null, 2))
-        } catch (failure) {
-          setError(`${failure.code ?? 'ACTION_FAILED'} · ${failure.message}`)
-        } finally {
-          setBusy(false)
-        }
-      }, [format])
-
-      const copy = useCallback(async () => {
-        try {
-          await navigator.clipboard.writeText(text)
-          setCopied(true)
-          setTimeout(() => setCopied(false), 1500)
-        } catch {
-          // Clipboard can be blocked; the textarea is selectable instead.
-        }
-      }, [text])
-
-      return h(
-        'section',
-        { className: 'mc-panel', 'aria-label': t('exportTitle') },
-        h(
-          'div',
-          { className: 'mc-panel-head' },
-          h('h3', { className: 'mc-panel-title' }, t('exportTitle')),
-          h('button', { type: 'button', className: 'mc-btn mc-btn-sm', onClick: onClose }, t('close')),
-        ),
-        h(
-          'div',
-          { className: 'mc-row-inline' },
-          h(
-            'select',
-            { className: 'mc-select', style: { maxWidth: '260px' }, value: format, onChange: (event) => setFormat(event.target.value) },
-            h('option', { value: 'mcpServers' }, t('exportMcp')),
-            h('option', { value: 'map' }, t('exportMap')),
-            h('option', { value: 'array' }, t('exportArray')),
-          ),
-          h('button', { type: 'button', className: 'mc-btn', disabled: busy, onClick: run }, t('exportRun')),
-          text ? h('button', { type: 'button', className: 'mc-btn', onClick: copy }, copied ? t('copied') : t('copy')) : null,
-        ),
-        error ? h(Note, { kind: 'error' }, error) : null,
-        h('textarea', {
-          className: 'mc-textarea',
-          style: { minHeight: '150px' },
-          value: text,
-          readOnly: true,
-          spellCheck: false,
-          placeholder: '{"mcpServers": {}}',
-        }),
-      )
-    }
-
     // ── page shell ────────────────────────────────────────────────────────────
 
     function ConnectorPage({ t, locale }) {
       const [snapshot, setSnapshot] = useState(null)
       const [loadError, setLoadError] = useState('')
       const [editor, setEditor] = useState(null)
-      const [panel, setPanel] = useState('')
       const [busyId, setBusyId] = useState('')
       const [toast, setToast] = useState('')
       const [probeReport, setProbeReport] = useState(null)
       const [query, setQuery] = useState('')
       const [feedback, setFeedback] = useState({})
       const feedbackTimers = useRef(new Map())
-      const [toolsMenu, setToolsMenu] = useState(false)
       const alive = useRef(true)
       const lastFocus = useRef(null)
       const openEditor = useCallback((next) => {
@@ -2266,37 +2043,17 @@ window.__ModuleLoader__.load({
           h('span', { className: 'mc-toolbar-spacer' }),
           h(
             'button',
+            { type: 'button', className: 'mc-btn', onClick: refresh },
+            h(Icon, { name: 'reload' }),
+            t('refresh'),
+          ),
+          h(
+            'button',
             { type: 'button', className: 'mc-btn mc-btn-primary', onClick: () => openEditor({ mode: 'add' }) },
             h(Icon, { name: 'plus' }),
             t('actionAdd'),
           ),
-          h(TipButton, {
-            label: t('moreActions'),
-            icon: 'more',
-            onClick: () => setToolsMenu((value) => !value),
-          }),
         ),
-        toolsMenu
-          ? h(
-            'div',
-            { className: 'mc-more' },
-            h(
-              'button',
-              { type: 'button', className: 'mc-btn mc-btn-sm', onClick: () => { setPanel(panel === 'import' ? '' : 'import'); setToolsMenu(false) } },
-              t('import'),
-            ),
-            h(
-              'button',
-              { type: 'button', className: 'mc-btn mc-btn-sm', onClick: () => { setPanel(panel === 'export' ? '' : 'export'); setToolsMenu(false) } },
-              t('export'),
-            ),
-            h(
-              'button',
-              { type: 'button', className: 'mc-btn mc-btn-sm', onClick: () => { setToolsMenu(false); refresh() } },
-              t('refresh'),
-            ),
-          )
-          : null,
 
         loadError ? h(Note, { kind: 'error' }, `${t('loadFailed')}${loadError}`) : null,
         !snapshot && !loadError
@@ -2329,11 +2086,6 @@ window.__ModuleLoader__.load({
             },
           })
           : null,
-
-        panel === 'import'
-          ? h(ImportPanel, { t, onDone: refresh, onClose: () => setPanel('') })
-          : null,
-        panel === 'export' ? h(ExportPanel, { t, onClose: () => setPanel('') }) : null,
 
         probeReport
           ? h(
@@ -2426,7 +2178,7 @@ window.__ModuleLoader__.load({
         ctx.slots.inject('settings.section', () => ctx.slots.register(
           { name: 'settings.section', id: 'mcp-connector', order: 60, label: () => t('title'), locale: NS },
           function McpConnectorSettings() {
-            return h(ConnectorPage, { t, locale })
+            return h(Boundary, null, h(ConnectorPage, { t, locale }))
           },
         ))
       },
