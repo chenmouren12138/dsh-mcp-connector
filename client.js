@@ -554,7 +554,11 @@ window.__ModuleLoader__.load({
       '.mc-actions .mc-tip-wrap:last-child>.mc-tip{left:auto;right:0;transform:translate(0,2px)}',
       '.mc-actions .mc-tip-wrap:last-child:hover>.mc-tip{transform:translate(0,0)}',
 
-      '.mc-act-danger:hover:not(:disabled){background:var(--dsw-alias-bg-layer-3)}',
+      // Hover keeps each action's colour; only the fill changes.
+      '.mc-act-danger:hover:not(:disabled){color:var(--dsw-alias-state-error-primary);background:var(--dsw-alias-bg-layer-3)}',
+      '.mc-act-retry:hover:not(:disabled){color:var(--dsw-alias-state-business-primary)}',
+      '.mc-act-power[data-tone="on"]:hover:not(:disabled){color:var(--dsw-alias-state-success-primary,var(--dsw-alias-state-business-primary))}',
+      '.mc-act-power[data-tone="off"]:hover:not(:disabled){color:var(--dsw-alias-state-warning-primary,var(--dsw-alias-label-secondary))}',
       '.mc-icon-danger{color:var(--dsw-alias-state-error-primary)}',
       '.mc-item .mc-note{margin:0}',
       '.mc-search{position:relative;display:flex;align-items:center;flex:1 1 220px;max-width:340px;min-width:0}',
