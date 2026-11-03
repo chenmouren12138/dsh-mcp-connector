@@ -39,6 +39,7 @@ window.__ModuleLoader__.load({
       noMatch: '没有匹配「{query}」的服务器',
       rowActions: '该服务器操作',
       oauthAuthorize: '授权',
+      oauthPendingShort: '授权中…',
       oauthRevoke: '取消授权',
       oauthPending: '等待浏览器完成授权…',
       oauthAuthorized: '已授权',
@@ -153,6 +154,7 @@ window.__ModuleLoader__.load({
       noMatch: 'No server matches “{query}”',
       rowActions: 'Server actions',
       oauthAuthorize: 'Authorize',
+      oauthPendingShort: 'Authorizing…',
       oauthRevoke: 'Revoke',
       oauthPending: 'Waiting for the browser to finish…',
       oauthAuthorized: 'Authorized',
@@ -443,6 +445,15 @@ window.__ModuleLoader__.load({
       'color:inherit;background:0 0;border:0;cursor:pointer;text-align:left}',
       '.mc-disclosure:focus-visible{outline:var(--dsw-focus-ring-width) solid',
       'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:2px;border-radius:4px}',
+      '.mc-tag-btn{display:inline-flex;align-items:center;height:22px;padding:0 9px;font:inherit;',
+      'font-size:12px;line-height:20px;cursor:pointer;color:var(--dsw-alias-label-secondary);',
+      'background:var(--dsw-alias-bg-layer-2);border:.5px solid var(--dsw-alias-border-l3);',
+      'border-radius:999px;transition:color .12s ease,border-color .12s ease,background-color .12s ease}',
+      '.mc-tag-btn:hover:not(:disabled){background:var(--dsw-alias-bg-layer-3);border-color:var(--dsw-alias-border-l4);',
+      'color:var(--dsw-alias-label-primary)}',
+      '.mc-tag-btn[data-tone="ok"]{color:var(--dsw-alias-state-success-primary,var(--dsw-alias-state-business-primary));',
+      'border-color:currentColor}',
+      '.mc-tag-btn:disabled{opacity:.55;cursor:default}',
       '.mc-chip{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:999px;',
       'font-size:12px;background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-secondary)}',
       '.mc-spacer{flex:1 1 auto}',
@@ -1591,6 +1602,22 @@ window.__ModuleLoader__.load({
             h('span', { className: 'mc-name' }, server.serverName),
           ),
           h(StateBadge, { state: server.state, label: server.stateLabel }),
+          server.config.transport !== 'stdio'
+            ? h(
+              'button',
+              {
+                type: 'button',
+                className: 'mc-tag-btn',
+                'data-tone': server.oauth?.authorized ? 'ok' : undefined,
+                disabled: busy !== '' || server.oauth?.status === 'pending',
+                title: server.oauth?.authorized ? t('oauthRevoke') : t('oauthAuthorize'),
+                onClick: () => onAction(server.oauth?.authorized ? 'oauthRevoke' : 'oauth', server),
+              },
+              server.oauth?.status === 'pending'
+                ? t('oauthPendingShort')
+                : server.oauth?.authorized ? t('oauthRevoke') : t('oauthAuthorize'),
+            )
+            : null,
           server.toolCount > 0
             ? h('span', { className: 'mc-chip' }, t('toolsCount', { count: server.toolCount }))
             : null,
@@ -1620,15 +1647,6 @@ window.__ModuleLoader__.load({
               disabled: busy !== '',
               onClick: () => onAction(server.disabled ? 'enable' : 'disable', server),
             }),
-            server.config.transport !== 'stdio'
-              ? h(TipButton, {
-                label: server.oauth?.authorized ? t('oauthRevoke') : t('oauthAuthorize'),
-                icon: server.oauth?.authorized ? 'shieldOff' : 'shield',
-                className: server.oauth?.authorized ? 'mc-act-shield-on' : 'mc-act-shield',
-                disabled: busy !== '' || server.oauth?.status === 'pending',
-                onClick: () => onAction(server.oauth?.authorized ? 'oauthRevoke' : 'oauth', server),
-              })
-              : null,
             h(TipButton, {
               label: t('edit'),
               icon: 'pencil',

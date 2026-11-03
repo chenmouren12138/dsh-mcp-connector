@@ -769,8 +769,8 @@ await check('OAuth：卡片上的授权 / 取消授权按钮调用对应动作',
   const listOf = () => findAll(root, (node) => node.props?.className === 'mc-list')[0]
   const httpCard = () => findAll(listOf(), (node) => node.props?.className === 'mc-item' && textOf(node).includes('broken'))[0]
 
-  const authorize = byAria(httpCard(), '授权')
-  assert.ok(authorize, 'authorize button on http servers')
+  const authorize = byText(httpCard(), '授权')
+  assert.ok(authorize, 'authorize tag button on http servers')
   authorize.props.onClick()
   await flush()
   const oauthCall = calls.find((item) => item.action === 'oauthBegin')
@@ -786,9 +786,9 @@ await check('OAuth：卡片上的授权 / 取消授权按钮调用对应动作',
   }
   root = mount()
   await flush()
-  assert.ok(byAria(httpCard(), '取消授权'), 'revoke button once authorized')
+  assert.ok(byText(httpCard(), '取消授权'), 'revoke tag button once authorized')
   assert.match(textOf(httpCard()), /已授权/)
-  byAria(httpCard(), '取消授权').props.onClick()
+  byText(httpCard(), '取消授权').props.onClick()
   await flush()
   assert.ok(calls.some((item) => item.action === 'oauthRevoke' && item.payload.id === oauthCall.payload.id))
 })
