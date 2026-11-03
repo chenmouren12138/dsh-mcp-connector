@@ -174,6 +174,14 @@ try {
     assert.equal(runtime.snapshot().servers.length, before)
   })
 
+  await check('行内「测试连接」按 id 探测已保存配置', async () => {
+    // Regression: posting only `{ id }` used to be read as a flat draft, which has
+    // no transport and failed with CONFIG_INVALID instead of probing.
+    const probe = await runtime.testConnection({ id: stdioId })
+    assert.equal(probe.ok, true, JSON.stringify(probe.error ?? probe))
+    assert.equal(probe.toolCount, 4)
+  })
+
   await check('测试失败返回结构化诊断（command 不存在）', async () => {
     const probe = await runtime.testConnection({
       serverName: 'probe2',
