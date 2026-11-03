@@ -647,6 +647,26 @@ await check('搜索过滤与无结果态，图标为矢量而非 emoji', async (
   assert.equal(findAll(root, (node) => node.props?.['aria-label'] === '搜索服务器')[0].props.value, '')
 })
 
+await check('编辑弹窗与添加弹窗同构：标题、名称锁定、动作顺序', async () => {
+  root = mount()
+  await flush()
+  const list = findAll(root, (node) => node.props?.className === 'mc-list')[0]
+  byText(list, '编辑').props.onClick()
+  await flush()
+  const dialog = findAll(root, (node) => node.props?.className === 'mc-dialog')[0]
+  assert.ok(dialog, 'edit dialog')
+  assert.equal(dialog.props['aria-label'], '编辑自定义 MCP')
+  const text = textOf(dialog)
+  assert.match(text, /编辑自定义 MCP/)
+  assert.match(text, /MCP 名称和 serverName 保持不变/)
+  assert.match(text, /Agent 将看到 serverName/)
+  const nameField = findAll(dialog, (node) => node.type === 'input' && node.props?.['aria-label'] === '服务器名（工具命名空间）')[0]
+  assert.equal(nameField.props.disabled, true, 'serverName is immutable while editing')
+  assert.ok(text.indexOf('取消') < text.indexOf('保存 MCP'), 'primary action sits last')
+  byText(dialog, '取消').props.onClick()
+  await flush()
+})
+
 await check('导入面板：逐条校验失败原样展示', async () => {
   byAria(findAll(root, (node) => node.props?.className === 'mc-toolbar')[0], '更多操作').props.onClick()
   rerender()
