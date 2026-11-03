@@ -2350,11 +2350,19 @@ window.__ModuleLoader__.load({
             parent = parent.parentElement
           }
 
+          const panelStyle = panel && typeof host.getComputedStyle === 'function' ? host.getComputedStyle(panel) : null
           const bottom = panel
-            ? panel.getBoundingClientRect().bottom - (Number.parseFloat(host.getComputedStyle(panel).paddingBottom) || 0)
+            ? panel.getBoundingClientRect().bottom - (Number.parseFloat(panelStyle?.paddingBottom) || 0)
             : host.innerHeight
           if (typeof bottom !== 'number' || Number.isNaN(bottom)) return
           node.style.maxHeight = `${Math.max(180, bottom - Math.max(0, top) - 8)}px`
+
+          // Push the scrollbar out to the panel's padding edge: widen the scroll
+          // container by the panel's right padding and give that width back as
+          // padding, so the rows keep their width and the thumb sits further right.
+          const padRight = Math.min(32, Math.max(0, Number.parseFloat(panelStyle?.paddingRight) || 0))
+          node.style.marginRight = padRight > 0 ? `-${padRight}px` : ''
+          node.style.paddingRight = padRight > 0 ? `${padRight}px` : ''
         }
 
         fit()
