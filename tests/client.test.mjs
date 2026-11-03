@@ -634,15 +634,15 @@ await check('添加 MCP 调用 addServer 并展示挂载回执', async () => {
   assert.match(textOf(root), /已添加服务器/)
 })
 
-await check('列表以上区域固定在顶部：标题 / 工具栏 / 类型标签在 sticky 容器内', async () => {
+await check('只有列表滚动：标题与工具栏保持原样，不加背景', async () => {
   root = mount()
   await flush()
-  const sticky = findAll(root, (node) => node.props?.className === 'mc-sticky')[0]
-  assert.ok(sticky, 'sticky wrapper rendered')
-  assert.equal(findAll(sticky, (node) => node.props?.className === 'mc-title').length, 1, 'title inside')
-  assert.equal(findAll(sticky, (node) => node.props?.className === 'mc-toolbar').length, 1, 'toolbar inside')
-  assert.equal(findAll(sticky, (node) => node.props?.className === 'mc-type-tabs').length, 1, 'tabs inside')
-  assert.equal(findAll(sticky, (node) => node.props?.className === 'mc-list').length, 0, 'the list scrolls, so it stays outside')
+  const scroll = findAll(root, (node) => node.props?.className === 'mc-scroll')[0]
+  assert.ok(scroll, 'scroll container rendered')
+  assert.equal(findAll(scroll, (node) => node.props?.className === 'mc-list').length, 1, 'the list lives inside it')
+  assert.equal(findAll(scroll, (node) => node.props?.className === 'mc-toolbar').length, 0, 'the toolbar stays outside')
+  assert.equal(findAll(root, (node) => node.props?.className === 'mc-toolbar').length, 1, 'toolbar still rendered once')
+  assert.equal(findAll(root, (node) => node.props?.className === 'mc-sticky').length, 0, 'no painted sticky block')
 })
 
 await check('类型标签：按产品类型筛选、数量、默认全部', async () => {

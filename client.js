@@ -303,8 +303,6 @@ window.__ModuleLoader__.load({
 
     // ── styles ────────────────────────────────────────────────────────────────
     const CSS = [
-      '.mc-sticky{position:sticky;top:0;z-index:4;display:flex;flex-direction:column;gap:14px;',
-      'padding:4px 0 10px;margin:-4px 0 0;background:var(--dsw-alias-bg-base)}',
       '.mc-root{display:flex;flex-direction:column;gap:14px;width:100%;max-width:760px;',
       'color:var(--dsw-alias-label-primary)}',
       '.mc-head{display:flex;flex-direction:column;gap:4px}',
@@ -338,6 +336,7 @@ window.__ModuleLoader__.load({
       '.mc-list-editor{list-style:none;margin:0;padding:0}',
       '.mc-list-editor .mc-panel{margin-top:2px}',
       '.mc-editor-standalone{margin:0 0 10px}',
+      '.mc-scroll{overflow:auto;overscroll-behavior:contain;min-height:0}',
       '.mc-list{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}',
       '.mc-item{display:flex;flex-direction:column;gap:8px;padding:12px 14px;',
       'border:.5px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-md);',
@@ -2321,9 +2320,31 @@ window.__ModuleLoader__.load({
       const feedbackTimers = useRef(new Map())
       const searchRef = useRef(null)
       const listRef = useRef(null)
+      const scrollRef = useRef(null)
       const filterBarRef = useRef(null)
       const filterTextRef = useRef(null)
       const alive = useRef(true)
+
+      // The list scrolls inside the viewport, so the header above it never moves
+      // and needs no background of its own.
+      useEffect(() => {
+        const host = typeof window === 'undefined' ? undefined : window
+        if (!host || typeof host.addEventListener !== 'function') return undefined
+        const fit = () => {
+          const node = scrollRef.current
+          if (!node || typeof node.getBoundingClientRect !== 'function') return
+          const top = node.getBoundingClientRect().top
+          const height = host.innerHeight
+          if (typeof top !== 'number' || Number.isNaN(top)) return
+          if (typeof height !== 'number' || Number.isNaN(height)) return
+          node.style.maxHeight = `${Math.max(180, height - top - 24)}px`
+        }
+        fit()
+        host.addEventListener('resize', fit)
+        return () => {
+          if (typeof host.removeEventListener === 'function') host.removeEventListener('resize', fit)
+        }
+      }, [typeFilter, query, snapshot])
       const lastFocus = useRef(null)
       const openEditor = useCallback((next) => {
         // Remember what had focus so closing the sheet returns it to the trigger.
@@ -2555,7 +2576,6 @@ window.__ModuleLoader__.load({
       return h(
         'div',
         { className: 'mc-root' },
-        h('div', { className: 'mc-sticky' },
         h(
           'header',
           { className: 'mc-head' },
@@ -2723,8 +2743,10 @@ window.__ModuleLoader__.load({
           )
           : null,
 
-        ),
-        servers.length === 0 && snapshot
+        h(
+          'div',
+          { className: 'mc-scroll', ref: scrollRef },
+          servers.length === 0 && snapshot
           ? h(
             'div',
             { className: 'mc-empty' },
@@ -2783,6 +2805,7 @@ window.__ModuleLoader__.load({
                 ]
               }),
             ),
+        ),
       )
     }
 
