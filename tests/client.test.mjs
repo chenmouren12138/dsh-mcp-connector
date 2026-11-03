@@ -784,6 +784,13 @@ await check('JSON 标签：一键优化格式化、保存基于 JSON 文本、�
   byText(panelOf(), '一键优化').props.onClick()
   rerender()
   assert.match(areaOf().props.value, /\n {2}"probe"/, 'pretty-printed and wrapped with the server name')
+  assert.match(textOf(panelOf()), /已整理为标准格式/, 'tidy-up confirms itself')
+
+  // A second click on already-formatted text still reports, so the button never
+  // looks dead.
+  byText(panelOf(), '一键优化').props.onClick()
+  rerender()
+  assert.match(textOf(panelOf()), /已整理为标准格式/)
 
   byText(panelOf(), '添加 MCP').props.onClick()
   await flush()

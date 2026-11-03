@@ -364,7 +364,7 @@ window.__ModuleLoader__.load({
       '.mc-form{display:flex;flex-direction:column;gap:14px}',
       '.mc-field-head{display:flex;align-items:center;justify-content:space-between;gap:12px}',
       '.mc-link-btn{padding:0;font:inherit;font-size:12.5px;cursor:pointer;color:var(--dsw-alias-link);background:0 0;border:0}',
-      '.mc-link-btn:hover{text-decoration:underline}',
+      '.mc-link-btn:hover{color:var(--dsw-alias-state-business-primary)}',
       '.mc-editor{gap:0;padding:0;overflow:visible}',
       '.mc-editor .mc-dialog-head{padding:14px 16px 8px}',
       '.mc-editor .mc-dialog-body{max-height:none;overflow:visible;padding:14px 16px}',
@@ -461,6 +461,8 @@ window.__ModuleLoader__.load({
       '.mc-details{display:flex;flex-direction:column;gap:10px;padding:10px 12px;',
       'border:.5px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm);',
       'background:var(--dsw-alias-bg-layer-2)}',
+      '.mc-field-actions{display:inline-flex;align-items:center;gap:8px}',
+      '.mc-json-notice{font-size:12px;line-height:18px;color:var(--dsw-alias-state-success-primary,var(--dsw-alias-state-business-primary))}',
       '.mc-json{position:relative;display:block;border:.5px solid var(--dsw-alias-border-l2);',
       'border-radius:var(--dsw-radius-sm);background:var(--dsw-alias-bg-base);overflow:hidden}',
       '.mc-json .mc-json-hl{position:absolute;inset:0;margin:0;padding:10px 12px;overflow:auto;',
@@ -1083,6 +1085,7 @@ window.__ModuleLoader__.load({
       const [toast, setToast] = useState('')
       const [jsonText, setJsonText] = useState('')
       const [jsonError, setJsonError] = useState('')
+      const [jsonNotice, setJsonNotice] = useState('')
       const [revealed, setRevealed] = useState({})
       // Rows are local state: an empty row is a legitimate editing state that the
       // serialized `headersText` cannot represent, so deriving them from the text
@@ -1165,8 +1168,8 @@ window.__ModuleLoader__.load({
           setRowList(headerRows(parsed.headersText))
           setJsonText(JSON.stringify(draftToEntry(parsed), null, 2))
           setJsonError('')
-          setStatus(t('jsonOptimized'))
-          setTimeout(() => setStatus(''), 2000).unref?.()
+          setJsonNotice(t('jsonOptimized'))
+          setTimeout(() => setJsonNotice(''), 2400).unref?.()
         } catch (error) {
           setJsonError(t('jsonInvalid', { message: error.message }))
         }
@@ -1329,9 +1332,16 @@ window.__ModuleLoader__.load({
                   { className: 'mc-field-head' },
                   h('label', { className: 'mc-label' }, t('tabJson')),
                   h(
-                    'button',
-                    { type: 'button', className: 'mc-link-btn', onClick: formatJson },
-                    t('jsonOptimize'),
+                    'span',
+                    { className: 'mc-field-actions' },
+                    jsonError
+                      ? h('span', { className: 'mc-json-notice mc-err', title: jsonError }, jsonError.slice(0, 42))
+                      : jsonNotice ? h('span', { className: 'mc-json-notice', role: 'status' }, jsonNotice) : null,
+                    h(
+                      'button',
+                      { type: 'button', className: 'mc-link-btn', onClick: formatJson },
+                      t('jsonOptimize'),
+                    ),
                   ),
                 ),
                 h(
