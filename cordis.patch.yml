@@ -1,0 +1,34 @@
+# @local/dsh-mcp-connector bundle patch.
+#
+# One Host row owns the MCP client seam: the protocol machinery, the runtime
+# server registry, the `mcp__<serverName>__<toolName>` tool bridge and the
+# same-origin management API that the Settings page drives. The row's `config`
+# is deployment policy only (timeouts, allowed transports, reconnect policy,
+# persistence location) — per-server connection parameters are runtime state and
+# never live here, so adding or editing a server never remounts this plugin.
+#
+# package.json `dsh.client` makes the Web app load the Client half, which
+# registers one tab under Settings → Plugins.
+- insert:
+    - id: dsh-mcp-connector
+      name: '@local/dsh-mcp-connector'
+      config:
+        enabled: true
+        defaultTimeoutMs: 30000
+        probeTimeoutMs: 10000
+        toolCallTimeoutMs: 60000
+        allowedTransports:
+          - stdio
+          - streamable-http
+        registry:
+          enabled: true
+          persist: true
+          dataDir: ''
+        reconnect:
+          enabled: true
+          initialDelayMs: 500
+          maxDelayMs: 30000
+          maxAttempts: 10
+        probeIntervalMs: 0
+        exposeTools: true
+        maxStderrLines: 40

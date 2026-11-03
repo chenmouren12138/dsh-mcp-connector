@@ -1,0 +1,57 @@
+{
+  "name": "@local/dsh-mcp-connector",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP 连接器：在 DSH 运行时内实现 MCP Client 能力 Seam，把外部 MCP 服务器的工具面动态映射到工具运行时（mcp__<server>__<tool>），并提供设置页内的服务器注册表 CRUD、连接测试、状态诊断与 JSON 导入导出。",
+  "type": "module",
+  "license": "MIT",
+  "icon": "./icon.svg",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "lib/*.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md"
+  ],
+  "keywords": [
+    "deepseek",
+    "harness",
+    "dsh",
+    "dsh-plugin",
+    "mcp",
+    "model-context-protocol",
+    "json-rpc",
+    "tools"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "scripts": {
+    "test": "node tests/host.test.mjs && node tests/api.test.mjs && node tests/client.test.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout"
+      ]
+    },
+    "compatibility": {
+      "host": ">=0.2.0-rc.1 <0.3.0-0",
+      "mcpClient": "^0.2.0-rc.2"
+    }
+  }
+}

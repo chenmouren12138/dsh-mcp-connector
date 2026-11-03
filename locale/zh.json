@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "MCP Connector",
+    "description": "把外部 MCP 服务器的工具接入 DSH：stdio 与 Streamable HTTP 双传输、协议协商、mcp__<服务器>__<工具> 命名映射，并提供设置页内的服务器注册表、连接测试与 JSON 导入导出。"
+  }
+}

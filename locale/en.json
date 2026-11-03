@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "MCP Connector",
+    "description": "Bridge external MCP servers into DSH: stdio and Streamable HTTP transports, protocol negotiation, mcp__<server>__<tool> naming, plus a settings registry with connection probes and JSON import/export."
+  }
+}

@@ -1,0 +1,39 @@
+# ── Node（本插件是 ESM 的 Cordis 插件，无构建步骤） ──────────────────────────
+node_modules/
+.pnpm-store/
+.npm/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tgz
+dist/
+build/
+out/
+coverage/
+*.tsbuildinfo
+
+# ── 测试运行期痕迹（不属于插件源码） ────────────────────────────────────────
+tests/tmp/
+*.log
+
+# ── 环境变量与密钥 ─────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# ── DSH 运行期痕迹 ─────────────────────────────────────────────────────────
+.plugin-manager/
+logs/
+
+# ── 编辑器 / 操作系统 ──────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*~
