@@ -94,16 +94,24 @@ window.__ModuleLoader__.load({
       fieldCwd: '工作目录',
       fieldUrl: '端点地址',
       fieldUrlHint: 'Streamable HTTP 端点，例如 https://example.com/mcp。',
-      fieldHeaders: '请求头',
-      fieldHeadersHint: '每行 KEY: VALUE。密钥可写成 ${credential:名称}，值只存进 DSH 凭据库，不写进注册表。',
+      fieldHeaders: '其他请求头',
+      fieldHeadersHint: '每行 KEY: VALUE。鉴权头在上面单独管理；这里放租户、版本这类非敏感头。密钥也可写成 ${credential:名称}。',
       fieldDisabled: '保存后禁用',
-      credTitle: '凭据（可选）',
-      credHint: '把令牌存进 DSH 凭据库，然后在上面的请求头写 ${credential:名称}。轮换令牌时只需改这里，配置文件不动。',
-      credRef: '凭据名称',
-      credValue: '凭据值',
-      credSave: '存入凭据库',
-      credSaved: '已存入凭据库；请求头里用 ${credential:名称} 引用即可',
-      credNeedBoth: '请同时填写凭据名称和值。',
+      authTitle: '鉴权',
+      authHint: '头名从令牌库选择，右侧填令牌。保存后只写入 DSH 凭据库，注册表里只留 ${credential:…} 引用。',
+      authHeaderLabel: '请求头',
+      authValueLabel: '令牌',
+      authApply: '存入凭据并应用',
+      authBind: '存入凭据并绑定',
+      authApplied: '已存入凭据库并应用到连接',
+      authBound: '已存入凭据库；保存服务器后生效',
+      authBoundRef: '已绑定 {ref}',
+      authChange: '更换',
+      authReveal: '显示',
+      authHide: '隐藏',
+      authNeedValue: '请先填写令牌。',
+      authNeedName: '请先填写服务器名，再生成凭据引用。',
+      authPlain: '当前为明文值，建议改为凭据引用',
       credOk: '已配置（{source}）',
       credMissing: '未配置',
       credUsed: '凭据引用',
@@ -221,16 +229,24 @@ window.__ModuleLoader__.load({
       fieldCwd: 'Working directory',
       fieldUrl: 'Endpoint',
       fieldUrlHint: 'Streamable HTTP endpoint, e.g. https://example.com/mcp.',
-      fieldHeaders: 'Headers',
-      fieldHeadersHint: 'One KEY: VALUE per line. Secrets may be written as ${credential:NAME}: the value lives in the DSH credential store, not in the registry.',
+      fieldHeaders: 'Other headers',
+      fieldHeadersHint: 'One KEY: VALUE per line. The auth header is managed above; use this for tenant, version and other non-secret headers. Secrets may also be written as ${credential:NAME}.',
       fieldDisabled: 'Save as disabled',
-      credTitle: 'Credential (optional)',
-      credHint: 'Store a token in the DSH credential store, then reference it from a header as ${credential:NAME}. Rotating it edits no configuration.',
-      credRef: 'Credential name',
-      credValue: 'Credential value',
-      credSave: 'Store in credentials',
-      credSaved: 'Stored; reference it from a header as ${credential:NAME}',
-      credNeedBoth: 'Enter both a credential name and a value.',
+      authTitle: 'Authentication',
+      authHint: 'Pick the header name from the token library and enter the token. Saving writes only to the DSH credential store; the registry keeps a ${credential:…} reference.',
+      authHeaderLabel: 'Header',
+      authValueLabel: 'Token',
+      authApply: 'Store and apply',
+      authBind: 'Store and bind',
+      authApplied: 'Stored in credentials and applied to the connection',
+      authBound: 'Stored; applies when the server is saved',
+      authBoundRef: 'Bound to {ref}',
+      authChange: 'Change',
+      authReveal: 'Show',
+      authHide: 'Hide',
+      authNeedValue: 'Enter the token first.',
+      authNeedName: 'Enter a server name before generating the credential reference.',
+      authPlain: 'Stored as a literal value; prefer a credential reference',
       credOk: 'Configured ({source})',
       credMissing: 'Not configured',
       credUsed: 'Credential references',
@@ -444,6 +460,79 @@ window.__ModuleLoader__.load({
       return Object.entries(map ?? {})
         .map(([key, value]) => (separator === '=' ? `${key}=${value}` : `${key}: ${value}`))
         .join('\n')
+    }
+
+    /** Header names the auth row can bind; the library is fixed, not free text. */
+    const AUTH_HEADER_LIBRARY = ['modao-token', 'Authorization', 'X-Api-Key', 'X-Auth-Token']
+
+    /** One line's `KEY: VALUE` split, or undefined. */
+    function splitHeaderLine(line) {
+      const index = line.indexOf(':')
+      if (index <= 0) return undefined
+      return { name: line.slice(0, index).trim(), value: line.slice(index + 1).trim() }
+    }
+
+    /** Read one header value out of the textarea text (case-insensitive name). */
+    function readHeaderValue(text, name) {
+      const target = name.toLowerCase()
+      for (const line of String(text ?? '').split(/\r?\n/)) {
+        const parsed = splitHeaderLine(line)
+        if (parsed && parsed.name.toLowerCase() === target) return parsed.value
+      }
+      return undefined
+    }
+
+    /** Replace (or insert) one header line, preserving every other line. */
+    function writeHeaderValue(text, name, value) {
+      const target = name.toLowerCase()
+      const lines = String(text ?? '').split(/\r?\n/).filter((line) => line.trim() !== '')
+      const output = []
+      let replaced = false
+      for (const line of lines) {
+        const parsed = splitHeaderLine(line)
+        if (parsed && parsed.name.toLowerCase() === target) {
+          if (!replaced) output.push(`${name}: ${value}`)
+          replaced = true
+          continue
+        }
+        output.push(line)
+      }
+      if (!replaced) output.push(`${name}: ${value}`)
+      return output.join('\n')
+    }
+
+    /** The `${credential:REF}` reference a header value holds, if any. */
+    function credentialRefOf(value) {
+      const match = /^\$\{credential:([A-Za-z0-9_.:-]{1,64})\}$/.exec(String(value ?? '').trim())
+      return match ? match[1] : undefined
+    }
+
+    /** Drop one header line (name compared case-insensitively). */
+    function removeHeaderValue(text, name) {
+      const target = name.toLowerCase()
+      return String(text ?? '')
+        .split(/\r?\n/)
+        .filter((line) => {
+          const parsed = splitHeaderLine(line)
+          return !(parsed && parsed.name.toLowerCase() === target)
+        })
+        .filter((line) => line.trim() !== '')
+        .join('\n')
+    }
+
+    /** Deterministic reference name for one server's auth header. */
+    function credentialRefName(serverName, header) {
+      const name = String(serverName ?? '').trim().replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').toUpperCase()
+      const field = String(header).replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').toUpperCase()
+      return `MCP_${name || 'SERVER'}_${field || 'TOKEN'}`.slice(0, 64)
+    }
+
+    /** Which auth header the current text seems to use. */
+    function detectAuthHeader(text) {
+      for (const name of AUTH_HEADER_LIBRARY) {
+        if (readHeaderValue(text, name) !== undefined) return name
+      }
+      return AUTH_HEADER_LIBRARY[0]
     }
 
     /** Split one argument line, honouring quotes. */
@@ -661,51 +750,85 @@ window.__ModuleLoader__.load({
       return errors
     }
 
-    function Editor({ mode, server, allowedTransports, t, onCancel, onSaved }) {
+    function Editor({ mode, server, allowedTransports, t, onCancel, onSaved, credentialRefs, onApplied }) {
       const [draft, setDraft] = useState(() => (server ? draftOf(server) : { ...EMPTY_DRAFT }))
       const [busy, setBusy] = useState('')
       const [errors, setErrors] = useState([])
       const [probe, setProbe] = useState(null)
       const [toast, setToast] = useState('')
-      const [credRef, setCredRef] = useState('')
-      const [credValue, setCredValue] = useState('')
-      const [credNote, setCredNote] = useState('')
+      const [authHeader, setAuthHeader] = useState(() => detectAuthHeader(server ? draftOf(server).headersText : ''))
+      const [authValue, setAuthValue] = useState('')
+      const [authVisible, setAuthVisible] = useState(false)
+      const [authNote, setAuthNote] = useState('')
       const nameRef = useRef(null)
+      const patch = useCallback((next) => setDraft((current) => ({ ...current, ...next })), [])
 
       useEffect(() => {
-        setDraft(server ? draftOf(server) : { ...EMPTY_DRAFT })
+        const next = server ? draftOf(server) : { ...EMPTY_DRAFT }
+        setDraft(next)
         setProbe(null)
         setErrors([])
         setToast('')
-        setCredValue('')
-        setCredNote('')
+        setAuthHeader(detectAuthHeader(next.headersText))
+        setAuthValue('')
+        setAuthVisible(false)
+        setAuthNote('')
       }, [server, mode])
 
       useEffect(() => {
         if (mode === 'add') nameRef.current?.focus()
       }, [mode])
 
-      /** Store the secret in the DSH credential store; the registry keeps only a ref. */
-      const storeCredential = useCallback(async () => {
-        if (credRef.trim() === '' || credValue === '') {
-          setCredNote(t('credNeedBoth'))
+      /**
+       * Bind the auth header to a credential reference: the token goes to the DSH
+       * credential store, the draft (and, when editing, the live connection) keeps
+       * only `${credential:REF}`. The value never enters the registry.
+       */
+      const applyAuth = useCallback(async () => {
+        if (authValue === '') {
+          setAuthNote(t('authNeedValue'))
           return
         }
-        setBusy('cred')
-        setCredNote('')
+        const name = (draft.serverName || server?.serverName || '').trim()
+        if (name === '') {
+          setAuthNote(t('authNeedName'))
+          return
+        }
+        const ref = credentialRefName(name, authHeader)
+        const headersText = writeHeaderValue(draft.headersText, authHeader, `\${credential:${ref}}`)
+        setBusy('auth')
+        setAuthNote('')
         try {
-          await request('setCredential', { ref: credRef.trim(), value: credValue })
-          setCredValue('')
-          setCredNote(t('credSaved'))
+          await request('setCredential', { ref, value: authValue })
+          setAuthValue('')
+          setAuthVisible(false)
+          if (mode === 'edit' && server?.id) {
+            const config = draftToConfig({ ...draft, headersText })
+            const result = await request('updateServer', {
+              id: server.id,
+              serverName: name,
+              disabled: draft.disabled,
+              config,
+            })
+            patch({ headersText })
+            setAuthNote(t('authApplied'))
+            onApplied?.(result)
+          } else {
+            patch({ headersText })
+            setAuthNote(t('authBound'))
+          }
         } catch (error) {
-          setCredNote(`${error.code ?? 'ACTION_FAILED'} · ${error.message}`)
+          setAuthNote(`${error.code ?? 'ACTION_FAILED'} · ${error.message}`)
         } finally {
           setBusy('')
         }
-      }, [credRef, credValue, t])
+      }, [authHeader, authValue, draft, mode, onApplied, patch, server, t])
+
+      const boundValue = readHeaderValue(draft.headersText, authHeader)
+      const boundRef = credentialRefOf(boundValue)
+      const boundStatus = credentialRefs?.find((item) => item.ref === boundRef)
 
       const transports = allowedTransports.length > 0 ? allowedTransports : ['stdio', 'streamable-http']
-      const patch = useCallback((next) => setDraft((current) => ({ ...current, ...next })), [])
 
       const buildPayload = useCallback(() => ({
         serverName: draft.serverName.trim(),
@@ -884,40 +1007,89 @@ window.__ModuleLoader__.load({
           }),
           t('fieldDisabled'),
         ),
-        h(
-          'div',
-          { className: 'mc-cred' },
-          h('h4', { className: 'mc-cred-title' }, t('credTitle')),
-          h('p', { className: 'mc-hint' }, t('credHint')),
-          h(
+        draft.transport !== 'stdio'
+          ? h(
             'div',
-            { className: 'mc-row-inline' },
-            h('input', {
-              className: 'mc-input',
-              style: { maxWidth: '220px' },
-              placeholder: t('credRef'),
-              value: credRef,
-              spellCheck: false,
-              autoComplete: 'off',
-              onChange: (event) => setCredRef(event.target.value),
-            }),
-            h('input', {
-              className: 'mc-input',
-              style: { maxWidth: '260px' },
-              type: 'password',
-              placeholder: t('credValue'),
-              value: credValue,
-              autoComplete: 'off',
-              onChange: (event) => setCredValue(event.target.value),
-            }),
+            { className: 'mc-cred' },
+            h('h4', { className: 'mc-cred-title' }, t('authTitle')),
+            h('p', { className: 'mc-hint' }, t('authHint')),
             h(
-              'button',
-              { type: 'button', className: 'mc-btn', disabled: busy === 'cred', onClick: storeCredential },
-              busy === 'cred' ? t('saving') : t('credSave'),
+              'div',
+              { className: 'mc-cred-row' },
+              h(
+                'select',
+                {
+                  className: 'mc-select',
+                  style: { maxWidth: '180px' },
+                  'aria-label': t('authHeaderLabel'),
+                  value: authHeader,
+                  onChange: (event) => {
+                    setAuthHeader(event.target.value)
+                    setAuthValue('')
+                    setAuthNote('')
+                  },
+                },
+                AUTH_HEADER_LIBRARY.map((name) => h('option', { key: name, value: name }, name)),
+              ),
+              boundRef
+                ? h('code', { className: 'mc-mono' }, `\${credential:${boundRef}}`)
+                : h('input', {
+                  className: 'mc-input',
+                  style: { maxWidth: '260px' },
+                  type: authVisible ? 'text' : 'password',
+                  'aria-label': t('authValueLabel'),
+                  placeholder: t('authValueLabel'),
+                  value: authValue,
+                  spellCheck: false,
+                  autoComplete: 'off',
+                  onChange: (event) => setAuthValue(event.target.value),
+                }),
+              boundRef
+                ? h(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'mc-btn mc-btn-sm',
+                    onClick: () => {
+                      patch({ headersText: removeHeaderValue(draft.headersText, authHeader) })
+                      setAuthNote('')
+                    },
+                  },
+                  t('authChange'),
+                )
+                : [
+                  h(
+                    'button',
+                    { key: 'reveal', type: 'button', className: 'mc-btn mc-btn-sm', onClick: () => setAuthVisible((value) => !value) },
+                    authVisible ? t('authHide') : t('authReveal'),
+                  ),
+                  h(
+                    'button',
+                    {
+                      key: 'apply',
+                      type: 'button',
+                      className: 'mc-btn mc-btn-sm mc-btn-primary',
+                      disabled: busy === 'auth',
+                      onClick: applyAuth,
+                    },
+                    busy === 'auth' ? t('saving') : mode === 'edit' ? t('authApply') : t('authBind'),
+                  ),
+                ],
             ),
-          ),
-          credNote ? h('p', { className: 'mc-hint' }, credNote) : null,
-        ),
+            h(
+              'p',
+              { className: 'mc-hint' },
+              boundRef
+                ? (boundStatus?.configured
+                  ? t('credOk', { source: boundStatus.source })
+                  : t('credMissing'))
+                : boundValue === undefined
+                  ? t('authNeedValue')
+                  : t('authPlain'),
+            ),
+            authNote ? h('p', { className: 'mc-hint' }, authNote) : null,
+          )
+          : null,
         errors.length > 0
           ? h(Note, { kind: 'error' }, errors.join('；'))
           : null,
@@ -1522,6 +1694,11 @@ window.__ModuleLoader__.load({
             t,
             onCancel: () => setEditor(null),
             onSaved: afterSave,
+            credentialRefs: editor.server ? (credentialStatus.get(editor.server.id) ?? []) : [],
+            onApplied: async (result) => {
+              setToast(result?.receipt?.message ?? '')
+              await refresh()
+            },
           })
           : null,
 

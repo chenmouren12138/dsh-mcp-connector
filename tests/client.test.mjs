@@ -478,27 +478,6 @@ await check('草稿测试连接返回结构化失败', async () => {
   assert.match(text, /config/)
 })
 
-await check('编辑器可把令牌存入凭据库', async () => {
-  const refInput = byPlaceholder(root, '凭据名称')
-  const valueInput = byPlaceholder(root, '凭据值')
-  assert.ok(refInput, 'credential name input')
-  assert.ok(valueInput, 'credential value input')
-  refInput.props.onChange({ target: { value: 'MODAO_TOKEN' } })
-  valueInput.props.onChange({ target: { value: 'sekret-value' } })
-  rerender()
-  const store = byText(root, '存入凭据库')
-  assert.ok(store, 'store button')
-  store.props.onClick()
-  await flush()
-  const call = calls.find((item) => item.action === 'setCredential')
-  assert.ok(call, 'setCredential called')
-  assert.equal(call.payload.ref, 'MODAO_TOKEN')
-  assert.equal(call.payload.value, 'sekret-value')
-  assert.match(textOf(root), /已存入凭据库/)
-  // The secret never lands in the connection config the editor would submit.
-  assert.ok(!JSON.stringify(snapshot).includes('sekret-value'))
-})
-
 await check('保存调用 addServer 并展示挂载回执', async () => {
   const save = byText(root, '保存')
   save.props.onClick()
@@ -510,6 +489,55 @@ await check('保存调用 addServer 并展示挂载回执', async () => {
   const text = textOf(root)
   assert.match(text, /已添加服务器/)
   assert.match(text, /mcp__probe__echo|echo/)
+})
+
+await check('鉴权行：头名只读、令牌掩码、绑定为凭据引用', async () => {
+  // Open a fresh add editor and switch it to Streamable HTTP.
+  byText(root, '添加服务器').props.onClick()
+  await flush()
+  const transport = byLabel(root, '传输方式')
+  transport.props.onChange({ target: { value: 'streamable-http' } })
+  rerender()
+  byLabel(root, '服务器名（工具命名空间）').props.onChange({ target: { value: 'modao' } })
+  byLabel(root, '端点地址').props.onChange({ target: { value: 'https://modao.cc/agent-py/ai/mcp' } })
+  rerender()
+
+  // Left side is a fixed library, not free text.
+  const headerSelect = findAll(root, (node) => node.type === 'select' && node.props?.['aria-label'] === '请求头')[0]
+  assert.ok(headerSelect, 'auth header select')
+  assert.equal(headerSelect.props.value, 'modao-token')
+  const options = findAll(headerSelect, (node) => node.type === 'option').map((node) => node.props.children)
+  assert.deepEqual(options, ['modao-token', 'Authorization', 'X-Api-Key', 'X-Auth-Token'])
+  assert.equal(findAll(root, (node) => node.type === 'input' && node.props?.['aria-label'] === '请求头').length, 0)
+
+  // Right side is a masked input by default, with an explicit reveal toggle.
+  let tokenInput = findAll(root, (node) => node.type === 'input' && node.props?.['aria-label'] === '令牌')[0]
+  assert.ok(tokenInput, 'token input')
+  assert.equal(tokenInput.props.type, 'password')
+  tokenInput.props.onChange({ target: { value: 'sekret-token' } })
+  rerender()
+  byText(root, '显示').props.onClick()
+  rerender()
+  tokenInput = findAll(root, (node) => node.type === 'input' && node.props?.['aria-label'] === '令牌')[0]
+  assert.equal(tokenInput.props.type, 'text')
+
+  // Binding writes the credential and leaves only a reference in the draft.
+  byText(root, '存入凭据并绑定').props.onClick()
+  await flush()
+  const call = calls.filter((item) => item.action === 'setCredential').at(-1)
+  assert.ok(call, 'setCredential called')
+  assert.equal(call.payload.ref, 'MCP_MODAO_MODAO_TOKEN')
+  assert.equal(call.payload.value, 'sekret-token')
+  const text = textOf(root)
+  assert.match(text, /\$\{credential:MCP_MODAO_MODAO_TOKEN\}/)
+  // After binding the input is gone: the value lives only in the credential store.
+  assert.equal(findAll(root, (node) => node.type === 'input' && node.props?.['aria-label'] === '令牌').length, 0)
+  assert.match(text, /已绑定 MCP_MODAO_MODAO_TOKEN|已存入凭据库/)
+
+  // Close the editor so later scenarios start from the list.
+  const editorPanel = findAll(root, (node) => node.props?.className === 'mc-panel' && node.props?.['aria-label'] === '添加服务器')[0]
+  byText(editorPanel, '取消').props.onClick()
+  await flush()
 })
 
 await check('列表行动作：禁用 / 重试 / 测试 / 删除二次确认', async () => {
